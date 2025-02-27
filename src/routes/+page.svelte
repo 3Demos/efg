@@ -1,2 +1,9 @@
-<h1>Welcome to SvelteKit</h1>
-<p>Visit <a href="https://svelte.dev/docs/kit">svelte.dev/docs/kit</a> to read the documentation</p>
+<h1>Electric Field Goal</h1>
+<p>
+	A <strike>rip-off</strike> homage to
+	<a
+		href="https://phet.colorado.edu/en/simulations/electric-hockey"
+		target="_blank"
+		rel="noopener noreferrer">Electric Field Hockey</a
+	>
+</p>
