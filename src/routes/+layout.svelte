@@ -1,5 +1,7 @@
 <script>
 	import '../app.css';
+	import { base } from '$app/paths';
+
 	let { children } = $props();
 </script>
 
@@ -9,10 +11,10 @@
 
 	<!-- Navigation links on the right -->
 	<div class="space-x-6">
-		<a href="/" class="text-white hover:text-gray-300">Home</a>
-		<a href="#" class="text-white hover:text-gray-300">About</a>
-		<a href="/2d" class="text-white hover:text-gray-300">2D</a>
-		<a href="/3d" class="text-white hover:text-gray-300">3D</a>
+		<a href="{base}/" class="text-white hover:text-gray-300">Home</a>
+		<a href="{base}/about" class="text-white hover:text-gray-300">About</a>
+		<a href="{base}/2d" class="text-white hover:text-gray-300">2D</a>
+		<a href="{base}/3d" class="text-white hover:text-gray-300">3D</a>
 	</div>
 </nav>
 
