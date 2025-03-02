@@ -48,8 +48,12 @@
 
 		function onMouseMove(e: MouseEvent) {
 			// console.log(e.clientY, e.offsetY, svg.clientHeight, e.target);
-			particle.x = (Math.max(0, Math.min(1, e.offsetX / svg.clientWidth)) - 0.5) * WIDTH;
-			particle.y = (Math.max(0, Math.min(1, e.offsetY / svg.clientHeight)) - 0.5) * HEIGHT;
+
+			const rect = svg?.getBoundingClientRect();
+			particle.x =
+				(Math.max(0, Math.min(1, (e.clientX - rect.left) / svg.clientWidth)) - 0.5) * WIDTH;
+			particle.y =
+				(Math.max(0, Math.min(1, (e.clientY - rect.top) / svg.clientHeight)) - 0.5) * HEIGHT;
 		}
 
 		function onMouseUp() {
