@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { rk4 } from '$lib/mathutils';
 	import { arrow } from './SVGSnippets.svelte';
 
 	interface Particle {
@@ -28,7 +29,7 @@
 	function vf(u: number, v: number) {
 		const vec = [0, 0];
 		for (const p of particles) {
-			const r = Math.hypot(u - p.x, v - p.y);
+			const r = Math.max(1, Math.hypot(u - p.x, v - p.y));
 			if (r == 0) {
 				return [Infinity, Infinity];
 			} else {
@@ -59,6 +60,21 @@
 		document.addEventListener('mouseup', onMouseUp);
 	}
 
+	interface DynParticle extends Particle {
+		vx: number;
+		vy: number;
+	}
+
+	let puck: DynParticle = $state({
+		x: 50,
+		y: -50,
+		charge: 10,
+		vx: 0,
+		vy: 0,
+	});
+
+	$inspect(puck);
+
 	// Field dimensions
 	const WIDTH = 300;
 	const HEIGHT = 200;
@@ -71,6 +87,41 @@
 		for (let j = 1; j <= HEIGHT / STEP; j++) {
 			vfCoords.push([i * STEP - Math.round(WIDTH / 2), j * STEP - Math.round(HEIGHT / 2)]);
 		}
+	}
+
+	// Playtime
+
+	let go = $state(false);
+	let last: number | undefined;
+	let req: number | undefined;
+	let clock = $state(0);
+
+	function updatePuck(dt: number) {
+		const v = rk4(
+			([x, y, vx, vy]) => {
+				const [ax, ay] = vf(x, y);
+				return [vx, vy, 1000 * puck.charge * ax, 1000 * puck.charge * ay];
+			},
+			[puck.x, puck.y, puck.vx, puck.vy],
+			dt,
+		);
+		puck.x = v[0];
+		puck.y = v[1];
+		puck.vx = v[2];
+		puck.vy = v[3];
+	}
+
+	function animate(t = 0) {
+		if (!go) {
+			last = undefined;
+			return;
+		}
+		if (!last) last = t;
+		const dt = (t - last) / 1000;
+		last = t;
+		updatePuck(dt);
+		clock += dt;
+		req = requestAnimationFrame(animate);
 	}
 </script>
 
@@ -101,10 +152,45 @@
 			onmousedown={(e) => onMouseDown(e, particle)}
 		/>
 	{/each}
+
+	<circle cx={puck.x} cy={puck.y} r="3" fill="black" />
 </svg>
 
-<style>
+<div class="flex w-40 items-center gap-2 p-3">
+	<button
+		onclick={() => {
+			go = !go;
+			if (go) req = requestAnimationFrame(animate);
+			// } else {
+			// 	if (req) cancelAnimationFrame(req);
+			// 	last = undefined;
+			// }
+		}}>{go ? 'Pause' : 'Play'}</button
+	>
+	<button
+		onclick={() => {
+			if (req) cancelAnimationFrame(req);
+			clock = 0;
+			last = undefined;
+			go = false;
+			puck = { x: 50, y: -50, vx: 0, vy: 0, charge: 10 };
+		}}>Reset</button
+	>
+	<span class="p-4 font-mono">{Math.round(1000 * clock) / 1000}</span>
+</div>
+
+<div>
+	<input class="m-3 p-4" bind:value={puck.charge} type="number" />
+</div>
+
+<style lang="postcss">
+	@reference "tailwindcss/theme";
+
 	svg {
 		border: 1px solid black;
+	}
+
+	button {
+		@apply rounded-lg bg-blue-600 px-4 py-2 font-medium text-white shadow-md transition hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none active:bg-blue-800;
 	}
 </style>
