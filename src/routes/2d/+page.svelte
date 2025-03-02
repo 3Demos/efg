@@ -33,8 +33,8 @@
 			if (r == 0) {
 				return [Infinity, Infinity];
 			} else {
-				vec[0] += (p.charge * (u - p.x)) / Math.pow(r, 3);
-				vec[1] += (p.charge * (v - p.y)) / Math.pow(r, 3);
+				vec[0] += (p.charge * (u - p.x)) / Math.pow(r, 2);
+				vec[1] += (p.charge * (v - p.y)) / Math.pow(r, 2);
 			}
 		}
 		return vec;
@@ -65,15 +65,23 @@
 		vy: number;
 	}
 
+	const PUCKX = 50;
+	const PUCKY = -50;
+
 	let puck: DynParticle = $state({
-		x: 50,
-		y: -50,
+		x: PUCKX,
+		y: PUCKY,
 		charge: 10,
 		vx: 0,
 		vy: 0,
 	});
 
-	$inspect(puck);
+	let puckTrace = $state([[PUCKX, PUCKY]]);
+	let traceString = $derived(
+		`M${PUCKX},${PUCKY} ` + puckTrace.map(([x, y]) => `L${x},${y} `).reduce((p = '', c) => p + c),
+	);
+
+	// $inspect(puck);
 
 	// Field dimensions
 	const WIDTH = 300;
@@ -109,6 +117,7 @@
 		puck.y = v[1];
 		puck.vx = v[2];
 		puck.vy = v[3];
+		puckTrace.push([v[0], v[1]]);
 	}
 
 	function animate(t = 0) {
@@ -123,6 +132,10 @@
 		clock += dt;
 		req = requestAnimationFrame(animate);
 	}
+
+	// Trace path
+
+	let showTrace = $state(false);
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -139,9 +152,20 @@
 			y,
 			(10 * vx) / Math.hypot(vx, vy),
 			(10 * vy) / Math.hypot(vx, vy),
-			200 * Math.hypot(vx, vy),
+			20 * Math.hypot(vx, vy),
 		)}
 	{/each}
+
+	{#if showTrace}
+		<path
+			d={traceString}
+			stroke="black"
+			stroke-width="1"
+			stroke-dasharray="5 2"
+			fill="none"
+			opacity={1}
+		/>
+	{/if}
 
 	{#each particles as particle}
 		<circle
@@ -174,6 +198,7 @@
 			last = undefined;
 			go = false;
 			puck = { x: 50, y: -50, vx: 0, vy: 0, charge: 10 };
+			puckTrace = [[PUCKX, PUCKY]];
 		}}>Reset</button
 	>
 	<span class="p-4 font-mono">{Math.round(1000 * clock) / 1000}</span>
@@ -181,6 +206,7 @@
 
 <div>
 	<input class="m-3 p-4" bind:value={puck.charge} type="number" />
+	<input type="checkbox" name="trace" id="" bind:checked={showTrace} />
 </div>
 
 <style lang="postcss">
