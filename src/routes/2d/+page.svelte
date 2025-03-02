@@ -201,12 +201,39 @@
 			puckTrace = [[PUCKX, PUCKY]];
 		}}>Reset</button
 	>
-	<span class="p-4 font-mono">{Math.round(1000 * clock) / 1000}</span>
+	<div>
+		<span class="inline-block w-20 p-4 font-mono">{Math.round(1000 * clock) / 1000}</span>
+	</div>
+	<button
+		onclick={() => {
+			particles.push({
+				x: (Math.random() - 1 / 2) * WIDTH,
+				y: (Math.random() - 1 / 2) * HEIGHT,
+				charge: 1,
+			});
+		}}>&plus;</button
+	>
+	<button
+		class="bg-red-500"
+		onclick={() => {
+			particles.push({
+				x: (Math.random() - 1 / 2) * WIDTH,
+				y: (Math.random() - 1 / 2) * HEIGHT,
+				charge: -1,
+			});
+		}}>&minus;</button
+	>
 </div>
 
 <div>
-	<input class="m-3 p-4" bind:value={puck.charge} type="number" />
-	<input type="checkbox" name="trace" id="" bind:checked={showTrace} />
+	<label for="charge">
+		Puck charge
+		<input bind:value={puck.charge} type="number" name="charge" />
+	</label>
+	<label for="trace">
+		Show Trace
+		<input type="checkbox" name="trace" id="" bind:checked={showTrace} />
+	</label>
 </div>
 
 <style lang="postcss">
