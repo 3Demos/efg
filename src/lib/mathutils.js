@@ -1,12 +1,16 @@
 /**
- * Gives the 2-norm of vector (dx,dy)
  *
- * @param {Number} dx
- * @param {Number} dy
- * @returns Number
+ * @param {number} dx
+ * @param {number} dy
+ * @returns [number, number]
  */
-function norm(dx, dy) {
-	return Math.sqrt(dx * dx + dy * dy);
+function normalize(dx, dy) {
+	const n = Math.hypot(dx, dy);
+	if (n > 0) {
+		return [dx / n, dy / n];
+	} else {
+		return [0, 0];
+	}
 }
 
-export { norm };
+export { normalize };
