@@ -88,18 +88,21 @@
 	// $inspect(puck);
 
 	// Field dimensions
-	const WIDTH = 300;
-	const HEIGHT = 200;
-	const STEP = 10;
+	let WIDTH = $state(300);
+	let HEIGHT = $derived((2 / 3) * WIDTH);
+	let STEP = 10;
 
 	type Point = [number, number];
-	const vfCoords: Point[] = [];
+	let vfCoords: Point[] = $derived.by(() => {
+		const out: [number, number][] = [];
 
-	for (let i = 1; i <= WIDTH / STEP; i++) {
-		for (let j = 1; j <= HEIGHT / STEP; j++) {
-			vfCoords.push([i * STEP - Math.round(WIDTH / 2), j * STEP - Math.round(HEIGHT / 2)]);
+		for (let i = 1; i <= WIDTH / STEP; i++) {
+			for (let j = 1; j <= HEIGHT / STEP; j++) {
+				out.push([i * STEP - Math.round(WIDTH / 2), j * STEP - Math.round(HEIGHT / 2)]);
+			}
 		}
-	}
+		return out;
+	});
 
 	// Playtime
 
@@ -184,18 +187,20 @@
 	<circle cx={puck.x} cy={puck.y} r="3" fill="black" />
 </svg>
 
-<div class="flex w-40 items-center gap-2 p-3">
+<div
+	class="flex flex-wrap items-center gap-4 rounded-lg border border-gray-200 bg-gray-50 p-4 shadow-sm"
+>
 	<button
+		class="rounded bg-green-500 px-4 py-2 font-medium text-white transition hover:bg-green-600"
 		onclick={() => {
 			go = !go;
 			if (go) req = requestAnimationFrame(animate);
-			// } else {
-			// 	if (req) cancelAnimationFrame(req);
-			// 	last = undefined;
-			// }
-		}}>{go ? 'Pause' : 'Play'}</button
+		}}
 	>
+		{go ? 'Pause' : 'Play'}
+	</button>
 	<button
+		class="rounded bg-gray-500 px-4 py-2 font-medium text-white transition hover:bg-gray-600"
 		onclick={() => {
 			if (req) cancelAnimationFrame(req);
 			clock = 0;
@@ -203,40 +208,89 @@
 			go = false;
 			puck = { x: 50, y: -50, vx: 0, vy: 0, charge: 10 };
 			puckTrace = [[PUCKX, PUCKY]];
-		}}>Reset</button
+		}}
 	>
+		Reset
+	</button>
 	<div>
-		<span class="inline-block w-20 p-4 font-mono">{Math.round(1000 * clock) / 1000}</span>
+		<span
+			class="inline-block w-24 rounded border border-gray-300 bg-white p-2 text-center font-mono"
+		>
+			{Math.round(1000 * clock) / 1000}
+		</span>
 	</div>
 	<button
+		class="rounded bg-blue-500 px-4 py-2 font-medium text-white transition hover:bg-blue-600"
 		onclick={() => {
 			particles.push({
 				x: (Math.random() - 1 / 2) * WIDTH,
 				y: (Math.random() - 1 / 2) * HEIGHT,
 				charge: 1,
 			});
-		}}>&plus;</button
+		}}
 	>
+		&oplus;
+	</button>
 	<button
-		class="bg-red-500"
+		class="rounded bg-red-500 px-4 py-2 font-medium text-white transition hover:bg-red-600"
 		onclick={() => {
 			particles.push({
 				x: (Math.random() - 1 / 2) * WIDTH,
 				y: (Math.random() - 1 / 2) * HEIGHT,
 				charge: -1,
 			});
-		}}>&minus;</button
+		}}
 	>
+		&ominus;
+	</button>
+	<div class="flex gap-2">
+		<button
+			class="rounded bg-gray-500 px-3 py-2 font-medium text-white transition hover:bg-gray-600"
+			onclick={() => {
+				WIDTH += 50;
+			}}
+		>
+			&#x1F50D;&minus;
+		</button>
+		<button
+			class="rounded bg-gray-500 px-3 py-2 font-medium text-white transition hover:bg-gray-600"
+			onclick={() => {
+				WIDTH = 300;
+			}}
+		>
+			&#x1F50D;&deg;
+		</button>
+		<button
+			class="rounded bg-gray-500 px-3 py-2 font-medium text-white transition hover:bg-gray-600"
+			onclick={() => {
+				WIDTH -= 50;
+			}}
+		>
+			&#x1F50D;&plus;
+		</button>
+	</div>
 </div>
 
-<div>
-	<label for="charge">
-		Puck charge
-		<input bind:value={puck.charge} type="number" name="charge" />
+<div
+	class="flex flex-wrap items-center gap-6 rounded-lg border border-gray-200 bg-gray-50 p-4 shadow-sm"
+>
+	<label for="charge" class="flex items-center gap-2">
+		<span class="font-medium">Puck charge</span>
+		<input
+			bind:value={puck.charge}
+			type="number"
+			name="charge"
+			class="w-20 rounded border border-gray-300 px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+		/>
 	</label>
-	<label for="trace">
-		Show Trace
-		<input type="checkbox" name="trace" id="" bind:checked={showTrace} />
+	<label for="trace" class="flex items-center gap-2">
+		<span class="font-medium">Show Trace</span>
+		<input
+			type="checkbox"
+			name="trace"
+			bind:checked={showTrace}
+			class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+		/>
 	</label>
 </div>
 
@@ -245,9 +299,5 @@
 
 	svg {
 		border: 1px solid black;
-	}
-
-	button {
-		@apply rounded-lg bg-blue-600 px-4 py-2 font-medium text-white shadow-md transition hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none active:bg-blue-800;
 	}
 </style>
