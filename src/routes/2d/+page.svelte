@@ -10,8 +10,8 @@
 
 	let particles: Particle[] = $state([
 		{
-			x: 0,
-			y: 0,
+			x: 60,
+			y: -50,
 			charge: 1,
 		},
 		{
@@ -29,7 +29,7 @@
 	function vf(u: number, v: number) {
 		const vec = [0, 0];
 		for (const p of particles) {
-			const r = Math.max(1, Math.hypot(u - p.x, v - p.y));
+			const r = Math.hypot(u - p.x, v - p.y);
 			if (r == 0) {
 				return [Infinity, Infinity];
 			} else {
@@ -44,7 +44,6 @@
 
 	function onMouseDown(e: MouseEvent, particle: Particle) {
 		e.preventDefault();
-		console.log('offset:', e.offsetX, e.offsetY, 'client:', e.clientX, e.clientY);
 
 		function onMouseMove(e: MouseEvent) {
 			// console.log(e.clientY, e.offsetY, svg.clientHeight, e.target);
@@ -69,8 +68,8 @@
 		vy: number;
 	}
 
-	const PUCKX = 50;
-	const PUCKY = -50;
+	const PUCKX = 0;
+	const PUCKY = 0;
 
 	let puck: DynParticle = $state({
 		x: PUCKX,
@@ -80,9 +79,10 @@
 		vy: 0,
 	});
 
-	let puckTrace = $state([[PUCKX, PUCKY]]);
+	let puckTrace: [number, number][] = $state([[PUCKX, PUCKY]]);
 	let traceString = $derived(
-		`M${PUCKX},${PUCKY} ` + puckTrace.map(([x, y]) => `L${x},${y} `).reduce((p = '', c) => p + c),
+		`M${PUCKX},${PUCKY} ` +
+			puckTrace.map(([x, y]) => `L${x},${y} `).reduce((p = '', c = '') => p + c),
 	);
 
 	// $inspect(puck);
@@ -181,6 +181,7 @@
 			r="5"
 			fill={particle.charge > 0 ? 'blue' : 'red'}
 			onmousedown={(e) => onMouseDown(e, particle)}
+			ondblclick={() => (particles = particles.filter((p) => p !== particle))}
 		/>
 	{/each}
 
@@ -206,7 +207,7 @@
 			clock = 0;
 			last = undefined;
 			go = false;
-			puck = { x: 50, y: -50, vx: 0, vy: 0, charge: 10 };
+			puck = { x: PUCKY, y: -PUCKY, vx: 0, vy: 0, charge: 10 };
 			puckTrace = [[PUCKX, PUCKY]];
 		}}
 	>
@@ -216,7 +217,7 @@
 		<span
 			class="inline-block w-24 rounded border border-gray-300 bg-white p-2 text-center font-mono"
 		>
-			{Math.round(1000 * clock) / 1000}
+			{Math.round(100 * clock) / 100}
 		</span>
 	</div>
 	<button
