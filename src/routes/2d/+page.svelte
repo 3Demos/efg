@@ -26,6 +26,8 @@
 		},
 	]);
 
+	let decay = $state(2);
+
 	function vf(u: number, v: number) {
 		const vec = [0, 0];
 		for (const p of particles) {
@@ -33,8 +35,8 @@
 			if (r == 0) {
 				return [Infinity, Infinity];
 			} else {
-				vec[0] += (p.charge * (u - p.x)) / Math.pow(r, 2);
-				vec[1] += (p.charge * (v - p.y)) / Math.pow(r, 2);
+				vec[0] += (p.charge * (u - p.x)) / Math.pow(r, decay + 1);
+				vec[1] += (p.charge * (v - p.y)) / Math.pow(r, decay + 1);
 			}
 		}
 		return vec;
@@ -275,6 +277,15 @@
 <div
 	class="flex flex-wrap items-center gap-6 rounded-lg border border-gray-200 bg-gray-50 p-4 shadow-sm"
 >
+	<label for="decay" class="flex items-center gap-2">
+		<span class="font-medium">Decay rate</span>
+		<input
+			bind:value={decay}
+			type="number"
+			name="decay"
+			class="w-20 rounded border border-gray-300 px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+		/>
+	</label>
 	<label for="charge" class="flex items-center gap-2">
 		<span class="font-medium">Puck charge</span>
 		<input
