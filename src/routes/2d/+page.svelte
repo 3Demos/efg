@@ -28,12 +28,18 @@
 
 	let decay = $state(2);
 
+	const RADIUS = 2;
+
 	function vf(u: number, v: number) {
 		const vec = [0, 0];
 		for (const p of particles) {
 			const r = Math.hypot(u - p.x, v - p.y);
-			if (r == 0) {
-				return [Infinity, Infinity];
+			if (r < RADIUS) {
+				console.log('close call', p.x, p.y);
+				vec[0] +=
+					(Math.pow(r / RADIUS, 2) * (10 * (p.charge * (u - p.x)))) / Math.pow(r, decay + 1);
+				vec[1] +=
+					(Math.pow(r / RADIUS, 2) * (10 * (p.charge * (v - p.y)))) / Math.pow(r, decay + 1);
 			} else {
 				vec[0] += (10 * (p.charge * (u - p.x))) / Math.pow(r, decay + 1);
 				vec[1] += (10 * (p.charge * (v - p.y))) / Math.pow(r, decay + 1);
@@ -81,7 +87,7 @@
 		vy: 0,
 	});
 
-	$inspect(puck);
+	// $inspect(puck);
 
 	let puckTrace: [number, number][] = $state([[PUCKX, PUCKY]]);
 	let traceString = $derived(
@@ -94,7 +100,7 @@
 	// Field dimensions
 	let WIDTH = $state(300);
 	let HEIGHT = $derived((2 / 3) * WIDTH);
-	let STEP = $derived(Math.max(10, Math.round(WIDTH / 60)));
+	let STEP = $derived(Math.max(10, Math.round(WIDTH / 40)));
 
 	type Point = [number, number];
 	let vfCoords: Point[] = $derived.by(() => {
@@ -117,14 +123,14 @@
 
 	function updatePuck(dt: number) {
 		// make this adaptive?
-		const h = dt / 1000;
+		const h = dt / 10;
 		let v = leapfrog(
 			(x, y) => vf(x, y).map((c) => c * Math.pow(100, decay)),
 			[puck.vx, puck.vy],
 			[puck.x, puck.y],
 			h,
 		);
-		for (let index = 1; index < 1000; index++) {
+		for (let index = 1; index < 10; index++) {
 			v = leapfrog(
 				(x, y) => vf(x, y).map((c) => c * Math.pow(100, decay)),
 				[v[2], v[3]],
@@ -169,8 +175,8 @@
 		{@render arrow(
 			x,
 			y,
-			(10 * vx) / Math.hypot(vx, vy),
-			(10 * vy) / Math.hypot(vx, vy),
+			(STEP * vx) / Math.hypot(vx, vy),
+			(STEP * vy) / Math.hypot(vx, vy),
 			Math.pow(4, decay) * Math.hypot(vx, vy),
 		)}
 	{/each}
