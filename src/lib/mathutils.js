@@ -51,4 +51,22 @@ function rk4(F, x, dt) {
 	return add(x, scale([f1, scale(f2, 2), scale(f3, 2), f4].reduce(add), 1 / 6));
 }
 
-export { normalize, rk4 };
+/**
+ * Velnet
+ * @param {(...v: number[]) => number[]} a acceleration field
+ * @param {number[]} v velocity
+ * @param {number[]} x position
+ * @param {number} dt time step
+ * @returns number[] new state
+ */
+function leapfrog(a, v, x, dt) {
+	// const n = x.length;
+
+	const vhalf = add(v, scale(a(...x), dt / 2));
+	const xfull = add(x, scale(vhalf, dt));
+	const vfull = add(vhalf, scale(a(...xfull), dt));
+
+	return [...xfull, ...vfull];
+}
+
+export { normalize, rk4, leapfrog };

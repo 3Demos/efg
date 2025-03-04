@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { rk4 } from '$lib/mathutils';
+	import { rk4, leapfrog } from '$lib/mathutils';
 	import { arrow } from './SVGSnippets.svelte';
 
 	interface Particle {
@@ -35,8 +35,8 @@
 			if (r == 0) {
 				return [Infinity, Infinity];
 			} else {
-				vec[0] += (p.charge * (u - p.x)) / Math.pow(r, decay + 1);
-				vec[1] += (p.charge * (v - p.y)) / Math.pow(r, decay + 1);
+				vec[0] += (10 * (p.charge * (u - p.x))) / Math.pow(r, decay + 1);
+				vec[1] += (10 * (p.charge * (v - p.y))) / Math.pow(r, decay + 1);
 			}
 		}
 		return vec;
@@ -81,6 +81,8 @@
 		vy: 0,
 	});
 
+	$inspect(puck);
+
 	let puckTrace: [number, number][] = $state([[PUCKX, PUCKY]]);
 	let traceString = $derived(
 		`M${PUCKX},${PUCKY} ` +
@@ -92,7 +94,7 @@
 	// Field dimensions
 	let WIDTH = $state(300);
 	let HEIGHT = $derived((2 / 3) * WIDTH);
-	let STEP = 10;
+	let STEP = $derived(Math.max(10, Math.round(WIDTH / 60)));
 
 	type Point = [number, number];
 	let vfCoords: Point[] = $derived.by(() => {
@@ -114,14 +116,22 @@
 	let clock = $state(0);
 
 	function updatePuck(dt: number) {
-		const v = rk4(
-			([x, y, vx, vy]) => {
-				const [ax, ay] = vf(x, y);
-				return [vx, vy, 1000 * puck.charge * ax, 1000 * puck.charge * ay];
-			},
-			[puck.x, puck.y, puck.vx, puck.vy],
-			dt,
+		// make this adaptive?
+		const h = dt / 1000;
+		let v = leapfrog(
+			(x, y) => vf(x, y).map((c) => c * Math.pow(100, decay)),
+			[puck.vx, puck.vy],
+			[puck.x, puck.y],
+			h,
 		);
+		for (let index = 1; index < 1000; index++) {
+			v = leapfrog(
+				(x, y) => vf(x, y).map((c) => c * Math.pow(100, decay)),
+				[v[2], v[3]],
+				[v[0], v[1]],
+				h,
+			);
+		}
 		puck.x = v[0];
 		puck.y = v[1];
 		puck.vx = v[2];
@@ -161,7 +171,7 @@
 			y,
 			(10 * vx) / Math.hypot(vx, vy),
 			(10 * vy) / Math.hypot(vx, vy),
-			20 * Math.hypot(vx, vy),
+			Math.pow(4, decay) * Math.hypot(vx, vy),
 		)}
 	{/each}
 
