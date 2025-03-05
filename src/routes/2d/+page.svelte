@@ -123,26 +123,31 @@
 
 	function updatePuck(dt: number) {
 		// make this adaptive?
-		const h = dt / 10;
-		let v = leapfrog(
-			(x, y) => vf(x, y).map((c) => c * Math.pow(100, decay)),
-			[puck.vx, puck.vy],
-			[puck.x, puck.y],
-			h,
-		);
-		for (let index = 1; index < 10; index++) {
-			v = leapfrog(
-				(x, y) => vf(x, y).map((c) => c * Math.pow(100, decay)),
-				[v[2], v[3]],
-				[v[0], v[1]],
-				h,
-			);
+		let runningTime = 0;
+		let v = [puck.x, puck.y, puck.vx, puck.vy];
+		let ticks = 0;
+		while (runningTime < dt) {
+			// const d = Math.hypot(...vf(v[0], v[1]));
+			let h = Math.max(1e-8, dt / Math.max(10, Math.hypot(v[2], v[3])));
+			h - Math.min(h, dt - runningTime);
+			runningTime += h;
+
+			for (let index = 0; index < 10; index++) {
+				v = leapfrog(
+					(x, y) => vf(x, y).map((c) => c * Math.pow(10, decay)),
+					[v[2], v[3]],
+					[v[0], v[1]],
+					h,
+				);
+			}
+			ticks += 1;
 		}
 		puck.x = v[0];
 		puck.y = v[1];
 		puck.vx = v[2];
 		puck.vy = v[3];
 		puckTrace.push([v[0], v[1]]);
+		if (ticks > 11) console.log('tickss: ', ticks);
 	}
 
 	function animate(t = 0) {
@@ -177,7 +182,7 @@
 			y,
 			(STEP * vx) / Math.hypot(vx, vy),
 			(STEP * vy) / Math.hypot(vx, vy),
-			Math.pow(4, decay) * Math.hypot(vx, vy),
+			Math.pow(40, decay - 1) * Math.hypot(vx, vy),
 		)}
 	{/each}
 
