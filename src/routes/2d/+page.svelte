@@ -168,163 +168,163 @@
 	let showTrace = $state(false);
 </script>
 
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<svg
-	bind:this={svg}
-	xmlns="http://www.w3.org/2000/svg"
-	width="600"
-	height="400"
-	viewBox="{-WIDTH / 2} {-HEIGHT / 2} {WIDTH} {HEIGHT}"
->
-	{#each vfCoords.map(([u, v]) => [u, v, ...vf(u, v)]) as [x, y, vx, vy]}
-		{@render arrow(
-			x,
-			y,
-			(STEP * vx) / Math.hypot(vx, vy),
-			(STEP * vy) / Math.hypot(vx, vy),
-			Math.pow(40, decay - 1) * Math.hypot(vx, vy),
-		)}
-	{/each}
-
-	{#if showTrace}
-		<path
-			d={traceString}
-			stroke="black"
-			stroke-width="1"
-			stroke-dasharray="5 2"
-			fill="none"
-			opacity={1}
-		/>
-	{/if}
-
-	{#each particles as particle}
-		<circle
-			cx={particle.x}
-			cy={particle.y}
-			r="5"
-			fill={particle.charge > 0 ? 'blue' : 'red'}
-			onmousedown={(e) => onMouseDown(e, particle)}
-			ondblclick={() => (particles = particles.filter((p) => p !== particle))}
-		/>
-	{/each}
-
-	<circle cx={puck.x} cy={puck.y} r="3" fill="black" />
-</svg>
-
-<div
-	class="flex flex-wrap items-center gap-4 rounded-lg border border-gray-200 bg-gray-50 p-4 shadow-sm"
->
-	<button
-		class="rounded bg-green-500 px-4 py-2 font-medium text-white transition hover:bg-green-600"
-		onclick={() => {
-			go = !go;
-			if (go) req = requestAnimationFrame(animate);
-		}}
+<div class="flex flex-col items-center">
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<svg
+		bind:this={svg}
+		xmlns="http://www.w3.org/2000/svg"
+		viewBox="{-WIDTH / 2} {-HEIGHT / 2} {WIDTH} {HEIGHT}"
 	>
-		{go ? 'Pause' : 'Play'}
-	</button>
-	<button
-		class="rounded bg-gray-500 px-4 py-2 font-medium text-white transition hover:bg-gray-600"
-		onclick={() => {
-			if (req) cancelAnimationFrame(req);
-			clock = 0;
-			last = undefined;
-			go = false;
-			puck = { x: PUCKY, y: -PUCKY, vx: 0, vy: 0, charge: 10 };
-			puckTrace = [[PUCKX, PUCKY]];
-		}}
+		{#each vfCoords.map(([u, v]) => [u, v, ...vf(u, v)]) as [x, y, vx, vy]}
+			{@render arrow(
+				x,
+				y,
+				(STEP * vx) / Math.hypot(vx, vy),
+				(STEP * vy) / Math.hypot(vx, vy),
+				Math.pow(40, decay - 1) * Math.hypot(vx, vy),
+			)}
+		{/each}
+
+		{#if showTrace}
+			<path
+				d={traceString}
+				stroke="black"
+				stroke-width="1"
+				stroke-dasharray="5 2"
+				fill="none"
+				opacity={1}
+			/>
+		{/if}
+
+		{#each particles as particle}
+			<circle
+				cx={particle.x}
+				cy={particle.y}
+				r="5"
+				fill={particle.charge > 0 ? 'blue' : 'red'}
+				onmousedown={(e) => onMouseDown(e, particle)}
+				ondblclick={() => (particles = particles.filter((p) => p !== particle))}
+			/>
+		{/each}
+
+		<circle cx={puck.x} cy={puck.y} r="3" fill="black" />
+	</svg>
+
+	<div
+		class="flex flex-wrap items-center gap-4 rounded-lg border border-gray-200 bg-gray-50 p-4 shadow-sm"
 	>
-		Reset
-	</button>
-	<div>
-		<span
-			class="inline-block w-24 rounded border border-gray-300 bg-white p-2 text-center font-mono"
+		<button
+			class="rounded bg-green-500 px-4 py-2 font-medium text-white transition hover:bg-green-600"
+			onclick={() => {
+				go = !go;
+				if (go) req = requestAnimationFrame(animate);
+			}}
 		>
-			{Math.round(100 * clock) / 100}
-		</span>
+			{go ? 'Pause' : 'Play'}
+		</button>
+		<button
+			class="rounded bg-gray-500 px-4 py-2 font-medium text-white transition hover:bg-gray-600"
+			onclick={() => {
+				if (req) cancelAnimationFrame(req);
+				clock = 0;
+				last = undefined;
+				go = false;
+				puck = { x: PUCKY, y: -PUCKY, vx: 0, vy: 0, charge: 10 };
+				puckTrace = [[PUCKX, PUCKY]];
+			}}
+		>
+			Reset
+		</button>
+		<div>
+			<span
+				class="inline-block w-24 rounded border border-gray-300 bg-white p-2 text-center font-mono"
+			>
+				{Math.round(100 * clock) / 100}
+			</span>
+		</div>
+		<button
+			class="rounded bg-blue-500 px-4 py-2 font-medium text-white transition hover:bg-blue-600"
+			onclick={() => {
+				particles.push({
+					x: (Math.random() - 1 / 2) * WIDTH,
+					y: (Math.random() - 1 / 2) * HEIGHT,
+					charge: 1,
+				});
+			}}
+		>
+			&oplus;
+		</button>
+		<button
+			class="rounded bg-red-500 px-4 py-2 font-medium text-white transition hover:bg-red-600"
+			onclick={() => {
+				particles.push({
+					x: (Math.random() - 1 / 2) * WIDTH,
+					y: (Math.random() - 1 / 2) * HEIGHT,
+					charge: -1,
+				});
+			}}
+		>
+			&ominus;
+		</button>
+		<div class="flex gap-2">
+			<button
+				class="rounded bg-gray-500 px-3 py-2 font-medium text-white transition hover:bg-gray-600"
+				onclick={() => {
+					WIDTH += 50;
+				}}
+			>
+				&#x1F50D;&minus;
+			</button>
+			<button
+				class="rounded bg-gray-500 px-3 py-2 font-medium text-white transition hover:bg-gray-600"
+				onclick={() => {
+					WIDTH = 300;
+				}}
+			>
+				&#x1F50D;&deg;
+			</button>
+			<button
+				class="rounded bg-gray-500 px-3 py-2 font-medium text-white transition hover:bg-gray-600"
+				onclick={() => {
+					WIDTH -= 50;
+				}}
+			>
+				&#x1F50D;&plus;
+			</button>
+		</div>
 	</div>
-	<button
-		class="rounded bg-blue-500 px-4 py-2 font-medium text-white transition hover:bg-blue-600"
-		onclick={() => {
-			particles.push({
-				x: (Math.random() - 1 / 2) * WIDTH,
-				y: (Math.random() - 1 / 2) * HEIGHT,
-				charge: 1,
-			});
-		}}
-	>
-		&oplus;
-	</button>
-	<button
-		class="rounded bg-red-500 px-4 py-2 font-medium text-white transition hover:bg-red-600"
-		onclick={() => {
-			particles.push({
-				x: (Math.random() - 1 / 2) * WIDTH,
-				y: (Math.random() - 1 / 2) * HEIGHT,
-				charge: -1,
-			});
-		}}
-	>
-		&ominus;
-	</button>
-	<div class="flex gap-2">
-		<button
-			class="rounded bg-gray-500 px-3 py-2 font-medium text-white transition hover:bg-gray-600"
-			onclick={() => {
-				WIDTH += 50;
-			}}
-		>
-			&#x1F50D;&minus;
-		</button>
-		<button
-			class="rounded bg-gray-500 px-3 py-2 font-medium text-white transition hover:bg-gray-600"
-			onclick={() => {
-				WIDTH = 300;
-			}}
-		>
-			&#x1F50D;&deg;
-		</button>
-		<button
-			class="rounded bg-gray-500 px-3 py-2 font-medium text-white transition hover:bg-gray-600"
-			onclick={() => {
-				WIDTH -= 50;
-			}}
-		>
-			&#x1F50D;&plus;
-		</button>
-	</div>
-</div>
 
-<div
-	class="flex flex-wrap items-center gap-6 rounded-lg border border-gray-200 bg-gray-50 p-4 shadow-sm"
->
-	<label for="decay" class="flex items-center gap-2">
-		<span class="font-medium">Decay rate</span>
-		<input
-			bind:value={decay}
-			type="number"
-			name="decay"
-			class="w-20 rounded border border-gray-300 px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-		/>
-	</label>
-	<label for="charge" class="flex items-center gap-2">
-		<span class="font-medium">Puck charge</span>
-		<input
-			bind:value={puck.charge}
-			type="number"
-			name="charge"
-			class="w-20 rounded border border-gray-300 px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-		/>
-	</label>
-	<label for="trace" class="flex items-center gap-2">
-		<span class="font-medium">Show Trace</span>
-		<input
-			type="checkbox"
-			name="trace"
-			bind:checked={showTrace}
-			class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-		/>
-	</label>
+	<div
+		class="flex flex-wrap items-center gap-6 rounded-lg border border-gray-200 bg-gray-50 p-4 shadow-sm"
+	>
+		<label for="decay" class="flex items-center gap-2">
+			<span class="font-medium">Decay rate</span>
+			<input
+				bind:value={decay}
+				type="number"
+				name="decay"
+				class="w-20 rounded border border-gray-300 px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+			/>
+		</label>
+		<label for="charge" class="flex items-center gap-2">
+			<span class="font-medium">Puck charge</span>
+			<input
+				bind:value={puck.charge}
+				type="number"
+				name="charge"
+				class="w-20 rounded border border-gray-300 px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+			/>
+		</label>
+		<label for="trace" class="flex items-center gap-2">
+			<span class="font-medium">Show Trace</span>
+			<input
+				type="checkbox"
+				name="trace"
+				bind:checked={showTrace}
+				class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+			/>
+		</label>
+	</div>
 </div>
 
 <style lang="postcss">
@@ -332,5 +332,8 @@
 
 	svg {
 		border: 1px solid black;
+		width: 100vw;
+		max-width: 800px;
+		height: auto;
 	}
 </style>
