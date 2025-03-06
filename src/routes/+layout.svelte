@@ -1,5 +1,6 @@
 <script>
 	import '../app.css';
+	import M from '$lib/M.svelte';
 	import { base } from '$app/paths';
 
 	let { children } = $props();
@@ -7,7 +8,9 @@
 
 <nav class="flex items-center justify-between bg-blue-600 p-4">
 	<!-- Title on the left -->
-	<div class="text-lg font-semibold text-white">Electric Field Goal</div>
+	<div class="text-lg font-semibold text-white">
+		<M s={'\\mathbb{E}'} />lectric <M s={'\\mathbb F'} />ield <M s={'\\mathbb G'} />oal
+	</div>
 
 	<!-- Navigation links on the right -->
 	<div class="space-x-6">
