@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { rk4, leapfrog } from '$lib/mathutils';
 	import { arrow } from './SVGSnippets.svelte';
+	import goalSvg from '$lib/goal.svg?raw';
 
 	interface Particle {
 		x: number;
@@ -26,7 +27,19 @@
 		},
 	]);
 
+	//$inspect(particles);
+
 	let decay = $state(2);
+
+	// Goal-related constants and state
+	const scale = 0.3;
+	const GOAL_LENGTH = 120.32;  // Height of the goal in svg
+	const GOAL_WIDTH = 87.552;   // Width of the goal in svg
+
+	let gameOver = $state(false);
+	let winner = $state<'left' | 'right' | null>(null);
+
+
 
 	const RADIUS = 2;
 
@@ -35,7 +48,7 @@
 		for (const p of particles) {
 			const r = Math.hypot(u - p.x, v - p.y);
 			if (r < RADIUS) {
-				console.log('close call', p.x, p.y);
+				//console.log('close call', p.x, p.y);
 				vec[0] +=
 					(Math.pow(r / RADIUS, 2) * (10 * (p.charge * (u - p.x)))) / Math.pow(r, decay + 1);
 				vec[1] +=
@@ -48,10 +61,59 @@
 		return vec;
 	}
 
+	// Goal boundary collision detection
+
+	// in future collision should negate velocity coming into collision
+	function checkGoalCollision(x: number, y: number): [number, number] | null {
+
+		let g_width = scale * GOAL_WIDTH;
+		let g_length = scale * GOAL_LENGTH;
+
+		const leftGoalLowerX = -WIDTH/2;
+		const leftGoalUpperX = -WIDTH/2 + g_width;
+		
+		const leftGoalLowerLower = g_length/2; 
+		const leftGoalLowerUpper = g_length/2 + 0.1;
+
+		const leftGoalUpperUpper = -1 * g_length/2 - 0.1;
+		const leftGoalUpperLower = -1 * g_length/2;
+		
+		const rightGoalLowerX = WIDTH/2 - g_width;
+		const rightGoalUpperX = WIDTH/2;
+
+		const rightGoalLowerLower = g_length/2;
+		const rightGoalLowerUpper = g_length/2 + 0.1;
+
+		const rightGoalUpperUpper = -1 * g_length/2 - 0.1;
+		const rightGoalUpperLower = -1 * g_length/2;
+
+		// left goal 
+
+		if (x > leftGoalLowerX && x < leftGoalUpperX && y > leftGoalLowerLower && y < leftGoalLowerUpper) {
+			return [0, -1];
+		}
+		if (x > leftGoalLowerX && x < leftGoalUpperX && y < leftGoalUpperLower && y > leftGoalUpperUpper) {
+			return [0, -1];
+		}
+
+		// right goal
+
+		if (x > rightGoalLowerX && x < rightGoalUpperX && y > rightGoalLowerLower && y < rightGoalLowerUpper) {
+			return [0, -1];
+		}
+		if (x > rightGoalLowerX && x < rightGoalUpperX && y < rightGoalUpperLower && y > rightGoalUpperUpper) {
+			return [0, -1];
+		}
+
+		return null;
+	}
+
 	let svg: SVGElement;
 
 	function onMouseDown(e: MouseEvent, particle: Particle) {
 		e.preventDefault();
+
+	
 
 		function onMouseMove(e: MouseEvent) {
 			// console.log(e.clientY, e.offsetY, svg.clientHeight, e.target);
@@ -87,7 +149,7 @@
 		vy: 0,
 	});
 
-	// $inspect(puck);
+	//$inspect(puck);
 
 	let puckTrace: [number, number][] = $state([[PUCKX, PUCKY]]);
 	let traceString = $derived(
@@ -95,7 +157,7 @@
 			puckTrace.map(([x, y]) => `L${x},${y} `).reduce((p = '', c = '') => p + c),
 	);
 
-	// $inspect(puck);
+	//$inspect(puck);
 
 	// Field dimensions
 	let WIDTH = $state(300);
@@ -121,15 +183,38 @@
 	let req: number | undefined;
 	let clock = $state(0);
 
+	function checkGoal() {
+		// Check if puck is within goal dimensions
+		if (puck.y > (-GOAL_WIDTH * scale)/2 && puck.y < (GOAL_WIDTH * scale)/2) {
+			// Check if puck has crossed the goal line
+			if (puck.x >= -WIDTH/2 && puck.x <= -WIDTH/2 + GOAL_WIDTH * (scale * 0.9)) {
+				gameOver = true;
+				winner = 'right';
+				return true;
+			} else if (puck.x <= WIDTH/2 && puck.x >= WIDTH/2 - GOAL_WIDTH * (scale * 0.9)) {
+				gameOver = true;
+				winner = 'left';
+				return true;
+			}
+		}
+		return false;
+	}
+
 	function updatePuck(dt: number) {
+		// Check for goal before updating
+		if (checkGoal()) {
+			go = false;
+			if (req) cancelAnimationFrame(req);
+			return;
+		}
+
 		// make this adaptive?
 		let runningTime = 0;
 		let v = [puck.x, puck.y, puck.vx, puck.vy];
 		let ticks = 0;
 		while (runningTime < dt) {
-			// const d = Math.hypot(...vf(v[0], v[1]));
 			let h = Math.max(1e-8, dt / Math.max(10, Math.hypot(v[2], v[3])));
-			h - Math.min(h, dt - runningTime);
+			h = Math.min(h, dt - runningTime);
 			runningTime += h;
 
 			for (let index = 0; index < 10; index++) {
@@ -139,6 +224,15 @@
 					[v[0], v[1]],
 					h,
 				);
+
+				// Check for goal boundary collision
+				const collision = checkGoalCollision(v[0], v[1]);
+				if (collision) {
+					// Apply bounce with some energy loss
+					const bounceFactor = 1;
+					v[2] *= collision[0] * bounceFactor;
+					v[3] *= collision[1] * bounceFactor;
+				}
 			}
 			ticks += 1;
 		}
@@ -196,6 +290,18 @@
 			/>
 		{/if}
 
+
+
+		<!-- Left Goal -->
+		<g transform={`translate(${-WIDTH/2}, ${scale * GOAL_LENGTH/2}) scale(${scale}) rotate(-90)`}>
+			{@html goalSvg}
+		</g>
+
+		<!-- Right Goal -->
+		<g transform={`translate(${WIDTH/2}, ${-scale * GOAL_LENGTH/2}) scale(${scale}) rotate(90)`}>
+			{@html goalSvg}
+		</g>
+
 		{#each particles as particle}
 			<circle
 				cx={particle.x}
@@ -213,6 +319,11 @@
 	<div
 		class="flex flex-wrap items-center gap-4 rounded-lg border border-gray-200 bg-gray-50 p-4 shadow-sm"
 	>
+		{#if gameOver}
+			<div class="w-full text-center text-2xl font-bold text-green-600 mb-4">
+				{winner === 'left' ? 'Left' : 'Right'} side wins!
+			</div>
+		{/if}
 		<button
 			class="rounded bg-green-500 px-4 py-2 font-medium text-white transition hover:bg-green-600"
 			onclick={() => {
@@ -229,6 +340,8 @@
 				clock = 0;
 				last = undefined;
 				go = false;
+				gameOver = false;
+				winner = null;
 				puck = { x: PUCKY, y: -PUCKY, vx: 0, vy: 0, charge: 10 };
 				puckTrace = [[PUCKX, PUCKY]];
 			}}
