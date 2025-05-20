@@ -79,53 +79,60 @@
     return e;
   }
 
-  function updateField(){
-    arrowHelpers.forEach(a => scene.remove(a));
+  function updateField() {
+    arrowHelpers.forEach(o => scene.remove(o));
     arrowHelpers = [];
-    let densityFactor =2;
+    const electronRadius = 0.2; 
+    const gap = 0.2; 
+    const startOffset = electronRadius + gap;  
+    const numLines = 10; 
+    const segments = 30;
+    const segmentLenBase = 0.4;
 
-    const gridSize = 15;
-    const step = 0.5;
-    let maxMag = 0;
-    const samples: { pos: THREE.Vector3; dir: THREE.Vector3; mag: number }[] = [];
-    // collect power of field
-    for (let x = -gridSize; x <= gridSize; x += step/densityFactor) {
-      for (let z = -gridSize; z <= gridSize; z += step/densityFactor) {
-        const pos = new THREE.Vector3(x, 0.1, z);
-        const e = computeFieldAt(pos);
-        const mag = e.length();
-        if(mag<1e-7) continue;
-        samples.push({ pos, dir: e.normalize(), mag });
-        maxMag = Math.max(maxMag, mag);
+    const shaftRadius  = 0.02; 
+    const headRadius = 0.05;  
+    const headHeight= 0.15; 
+    const initDirs = [
+      new THREE.Vector3( 1,  0,  0),
+      new THREE.Vector3(-1,  0,  0),
+      new THREE.Vector3( 0,  1,  0),
+      new THREE.Vector3( 0, -1,  0),
+      new THREE.Vector3( 0,  0,  1),
+      new THREE.Vector3( 0,  0, -1),
+      new THREE.Vector3( 1,  1,  0).normalize(),
+      new THREE.Vector3(-1, -1,  0).normalize(),
+    ].slice(0, numLines);
+
+    for (const ch of charges) {
+      for (const dir0 of initDirs) {
+        let pos = ch.position.clone().add(dir0.clone().multiplyScalar(startOffset));
+
+        for (let i = 0; i < segments; i++) {
+          const e   = computeFieldAt(pos);
+          const mag = e.length();
+
+          const eDir = e.normalize();
+          const segmentLen = segmentLenBase;  
+          const shaftLen  = segmentLen * 0.7;
+          const shaftGeo  = new THREE.CylinderGeometry(shaftRadius, shaftRadius, shaftLen, 8);
+          const shaftMat  = new THREE.MeshBasicMaterial({ color: new THREE.Color(0, 0, 0)});
+          const shaftMesh = new THREE.Mesh(shaftGeo, shaftMat);
+          shaftMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), eDir);
+          shaftMesh.position.copy(pos.clone().add(eDir.clone().multiplyScalar(shaftLen / 2)));
+          scene.add(shaftMesh);
+
+          const headGeo  = new THREE.ConeGeometry(headRadius, headHeight, 8);
+          const headMat  = shaftMat;
+          const headMesh = new THREE.Mesh(headGeo, headMat);
+          headMesh.quaternion.copy(shaftMesh.quaternion);
+          headMesh.position.copy(pos.clone().add(eDir.clone().multiplyScalar(shaftLen + headHeight / 2)));
+          scene.add(headMesh);
+
+          pos.add(eDir.clone().multiplyScalar(segmentLen));
+        }
       }
     }
-    maxMag = Math.max(maxMag, 0.001);
-    //draw arrows
-    for (const { pos, dir, mag } of samples) {
-        const normalizedMag = mag/maxMag;
-        const minBrightness = 0.001;
-        const maxBrightness = 0.5;
-        const brightness = maxBrightness - (normalizedMag * (maxBrightness - minBrightness));
-        const color = new THREE.Color(brightness, brightness, brightness);
-        const minLength = 0.2;
-        const maxLength = 0.8;
-        const len = minLength + normalizedMag * (maxLength - minLength);
-      
-
-        const minHeadLength = 0.08;
-        const maxHeadLength = 0.18;
-        const headLength = minHeadLength + normalizedMag * (maxHeadLength - minHeadLength);
-        
-        const minHeadWidth = 0.04;
-        const maxHeadWidth = 0.10;
-        const headWidth = minHeadWidth + normalizedMag * (maxHeadWidth - minHeadWidth);
-        const arrow = new THREE.ArrowHelper(dir, pos,len,color.getHex(),headLength,headWidth);
-        scene.add(arrow);
-        arrowHelpers.push(arrow);
-    }
   }
-
-
   function step() {
     // Compute force on puck
     const force = computeFieldAt(puckMesh.position).multiplyScalar(puckCharge);
