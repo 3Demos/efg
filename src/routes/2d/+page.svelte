@@ -2,6 +2,7 @@
 	import { rk4, leapfrog } from '$lib/mathutils';
 	import { arrow } from './SVGSnippets.svelte';
 	import goalSvg from '$lib/goal.svg?raw';
+	import barSvg from '$lib/bar.svg?raw';
 
 	interface Particle {
 		x: number;
@@ -32,14 +33,27 @@
 	let decay = $state(2);
 
 	// Goal-related constants and state
-	const scale = 0.3;
+	const g_scale = 0.3;
 	const GOAL_LENGTH = 120.32;  // Height of the goal in svg
 	const GOAL_WIDTH = 87.552;   // Width of the goal in svg
+
+	let g_width = g_scale * GOAL_WIDTH;
+	let g_length = g_scale * GOAL_LENGTH;
+
 
 	let gameOver = $state(false);
 	let winner = $state<'left' | 'right' | null>(null);
 
 
+	const BAR_WIDTH = 2.176;
+	const BAR_LENGTH = 28.67;
+	
+	const b_scale = 71.3;
+
+	let bar_width = b_scale * BAR_WIDTH;
+	let bar_length = b_scale * BAR_LENGTH;
+
+	let wallsEnabled = $state(false);
 
 	const RADIUS = 2;
 
@@ -61,13 +75,41 @@
 		return vec;
 	}
 
+	// bar boundary collision detection
+	function checkBarCollision(x: number, y: number): [number, number] | null {
+		if (!wallsEnabled) return null;
+
+		const wallThickness = 4; // Match the stroke-width of the walls
+
+		// Top wall
+		if (y <= -HEIGHT/2 + wallThickness && y >= -HEIGHT/2) {
+			return [1, -1]; // Bounce down
+		}
+		// Bottom wall
+		if (y >= HEIGHT/2 - wallThickness && y <= HEIGHT/2) {
+			return [1, -1]; // Bounce up
+		}
+		// Left wall (excluding goal area)
+		if (x <= -WIDTH/2 + wallThickness && x >= -WIDTH/2) {
+			if (y < -g_length/2 || y > g_length/2) {
+				return [-1, 1]; // Bounce right
+			}
+		}
+		// Right wall (excluding goal area)
+		if (x >= WIDTH/2 - wallThickness && x <= WIDTH/2) {
+			if (y < -g_length/2 || y > g_length/2) {
+				return [-1, 1]; // Bounce left
+			}
+		}
+
+		return null;
+	}
+
 	// Goal boundary collision detection
 
-	// in future collision should negate velocity coming into collision
 	function checkGoalCollision(x: number, y: number): [number, number] | null {
 
-		let g_width = scale * GOAL_WIDTH;
-		let g_length = scale * GOAL_LENGTH;
+		
 
 		const leftGoalLowerX = -WIDTH/2;
 		const leftGoalUpperX = -WIDTH/2 + g_width;
@@ -90,19 +132,19 @@
 		// left goal 
 
 		if (x > leftGoalLowerX && x < leftGoalUpperX && y > leftGoalLowerLower && y < leftGoalLowerUpper) {
-			return [0, -1];
+			return [1, -1];
 		}
 		if (x > leftGoalLowerX && x < leftGoalUpperX && y < leftGoalUpperLower && y > leftGoalUpperUpper) {
-			return [0, -1];
+			return [1, -1];
 		}
 
 		// right goal
 
 		if (x > rightGoalLowerX && x < rightGoalUpperX && y > rightGoalLowerLower && y < rightGoalLowerUpper) {
-			return [0, -1];
+			return [1, -1];
 		}
 		if (x > rightGoalLowerX && x < rightGoalUpperX && y < rightGoalUpperLower && y > rightGoalUpperUpper) {
-			return [0, -1];
+			return [1, -1];
 		}
 
 		return null;
@@ -185,13 +227,13 @@
 
 	function checkGoal() {
 		// Check if puck is within goal dimensions
-		if (puck.y > (-GOAL_WIDTH * scale)/2 && puck.y < (GOAL_WIDTH * scale)/2) {
+		if (puck.y > (-g_width)/2 && puck.y < (g_width)/2) {
 			// Check if puck has crossed the goal line
-			if (puck.x >= -WIDTH/2 && puck.x <= -WIDTH/2 + GOAL_WIDTH * (scale * 0.9)) {
+			if (puck.x >= -WIDTH/2 && puck.x <= -WIDTH/2 + g_width * 0.9) {
 				gameOver = true;
 				winner = 'right';
 				return true;
-			} else if (puck.x <= WIDTH/2 && puck.x >= WIDTH/2 - GOAL_WIDTH * (scale * 0.9)) {
+			} else if (puck.x <= WIDTH/2 && puck.x >= WIDTH/2 - g_width* 0.9) {
 				gameOver = true;
 				winner = 'left';
 				return true;
@@ -226,12 +268,21 @@
 				);
 
 				// Check for goal boundary collision
-				const collision = checkGoalCollision(v[0], v[1]);
-				if (collision) {
+				const g_collision = checkGoalCollision(v[0], v[1]);
+				if (g_collision) {
 					// Apply bounce with some energy loss
 					const bounceFactor = 1;
-					v[2] *= collision[0] * bounceFactor;
-					v[3] *= collision[1] * bounceFactor;
+					v[2] *= g_collision[0] * bounceFactor;
+					v[3] *= g_collision[1] * bounceFactor;
+				}
+
+				// Check for bar boundary collision
+				const b_collision = checkBarCollision(v[0], v[1]);
+				if (b_collision) {
+					// Apply bounce with some energy loss
+					const bounceFactor = 1;
+					v[2] *= b_collision[0] * bounceFactor;
+					v[3] *= b_collision[1] * bounceFactor;
 				}
 			}
 			ticks += 1;
@@ -293,14 +344,71 @@
 
 
 		<!-- Left Goal -->
-		<g transform={`translate(${-WIDTH/2}, ${scale * GOAL_LENGTH/2}) scale(${scale}) rotate(-90)`}>
+		<g transform={`translate(${-WIDTH/2}, ${g_length/2}) scale(${g_scale}) rotate(-90)`}>
 			{@html goalSvg}
 		</g>
 
 		<!-- Right Goal -->
-		<g transform={`translate(${WIDTH/2}, ${-scale * GOAL_LENGTH/2}) scale(${scale}) rotate(90)`}>
+		<g transform={`translate(${WIDTH/2}, ${-g_length/2}) scale(${g_scale}) rotate(90)`}>
 			{@html goalSvg}
 		</g>
+
+		{#if wallsEnabled}
+			<!-- Top Wall -->
+			<line
+				x1={-WIDTH/2}
+				y1={-HEIGHT/2}
+				x2={WIDTH/2}
+				y2={-HEIGHT/2}
+				stroke="black"
+				stroke-width="4"
+			/>
+			<!-- Bottom Wall -->
+			<line
+				x1={-WIDTH/2}
+				y1={HEIGHT/2}
+				x2={WIDTH/2}
+				y2={HEIGHT/2}
+				stroke="black"
+				stroke-width="4"
+			/>
+			<!-- Left Wall (top) -->
+			<line
+				x1={-WIDTH/2}
+				y1={-HEIGHT/2}
+				x2={-WIDTH/2}
+				y2={-g_length/2}
+				stroke="black"
+				stroke-width="4"
+			/>
+			<!-- Left Wall (bottom) -->
+			<line
+				x1={-WIDTH/2}
+				y1={g_length/2}
+				x2={-WIDTH/2}
+				y2={HEIGHT/2}
+				stroke="black"
+				stroke-width="4"
+			/>
+			<!-- Right Wall (top) -->
+			<line
+				x1={WIDTH/2}
+				y1={-HEIGHT/2}
+				x2={WIDTH/2}
+				y2={-g_length/2}
+				stroke="black"
+				stroke-width="4"
+			/>
+			<!-- Right Wall (bottom) -->
+			<line
+				x1={WIDTH/2}
+				y1={g_length/2}
+				x2={WIDTH/2}
+				y2={HEIGHT/2}
+				stroke="black"
+				stroke-width="4"
+			/>
+		{/if}
 
 		{#each particles as particle}
 			<circle
@@ -434,6 +542,15 @@
 				type="checkbox"
 				name="trace"
 				bind:checked={showTrace}
+				class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+			/>
+		</label>
+		<label for="walls" class="flex items-center gap-2">
+			<span class="font-medium">Enable Walls</span>
+			<input
+				type="checkbox"
+				name="walls"
+				bind:checked={wallsEnabled}
 				class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
 			/>
 		</label>
