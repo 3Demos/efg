@@ -2,7 +2,6 @@
 	import { rk4, leapfrog } from '$lib/mathutils';
 	import { arrow } from './SVGSnippets.svelte';
 	import goalSvg from '$lib/goal.svg?raw';
-	import barSvg from '$lib/bar.svg?raw';
 
 	interface Particle {
 		x: number;
