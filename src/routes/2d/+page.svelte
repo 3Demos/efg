@@ -2,6 +2,12 @@
 	import { rk4, leapfrog } from '$lib/mathutils';
 	import { arrow } from './SVGSnippets.svelte';
 	import goalSvg from '$lib/goal.svg?raw';
+	import Goal from './Goal.svelte';
+
+	interface Position {
+		x: number;
+		y: number;
+	}
 
 	interface Particle {
 		x: number;
@@ -33,24 +39,14 @@
 
 	// Goal-related constants and state
 	const g_scale = 0.3;
-	const GOAL_LENGTH = 120.32;  // Height of the goal in svg
-	const GOAL_WIDTH = 87.552;   // Width of the goal in svg
+	const GOAL_LENGTH = 120.32; // Height of the goal in svg
+	const GOAL_WIDTH = 87.552; // Width of the goal in svg
 
 	let g_width = g_scale * GOAL_WIDTH;
 	let g_length = g_scale * GOAL_LENGTH;
 
-
 	let gameOver = $state(false);
 	let winner = $state<'left' | 'right' | null>(null);
-
-
-	const BAR_WIDTH = 2.176;
-	const BAR_LENGTH = 28.67;
-	
-	const b_scale = 71.3;
-
-	let bar_width = b_scale * BAR_WIDTH;
-	let bar_length = b_scale * BAR_LENGTH;
 
 	let wallsEnabled = $state(false);
 
@@ -74,76 +70,134 @@
 		return vec;
 	}
 
-	// bar boundary collision detection
-	function checkBarCollision(x: number, y: number): [number, number] | null {
-		if (!wallsEnabled) return null;
+	function intersect(p1: Position, p2: Position, p3: Position, p4: Position): Position | null {
+		const det = (p1.x - p2.x) * (p3.y - p4.y) - (p1.y - p2.y) * (p3.x - p4.x);
 
-		const wallThickness = 4; // Match the stroke-width of the walls
+		// Lines are parallel, no intersection
+		if (det === 0) return null;
 
-		// Top wall
-		if (y <= -HEIGHT/2 + wallThickness && y >= -HEIGHT/2) {
-			return [1, -1]; // Bounce down
-		}
-		// Bottom wall
-		if (y >= HEIGHT/2 - wallThickness && y <= HEIGHT/2) {
-			return [1, -1]; // Bounce up
-		}
-		// Left wall (excluding goal area)
-		if (x <= -WIDTH/2 + wallThickness && x >= -WIDTH/2) {
-			if (y < -g_length/2 || y > g_length/2) {
-				return [-1, 1]; // Bounce right
-			}
-		}
-		// Right wall (excluding goal area)
-		if (x >= WIDTH/2 - wallThickness && x <= WIDTH/2) {
-			if (y < -g_length/2 || y > g_length/2) {
-				return [-1, 1]; // Bounce left
-			}
+		const t1 = ((p1.x - p3.x) * (p3.y - p4.y) - (p1.y - p3.y) * (p3.x - p4.x)) / det;
+		const t2 = ((p1.x - p3.x) * (p1.y - p2.y) - (p1.y - p3.y) * (p1.x - p2.x)) / det;
+
+		// Check if intersection point is within both segments
+		if (t1 >= 0 && t1 <= 1 && t2 >= 0 && t2 <= 1) {
+			// Calculate the intersection point
+			const ix = p1.x + t1 * (p2.x - p1.x);
+			const iy = p1.y + t1 * (p2.y - p1.y);
+
+			// Reflect p2 across the line through p3 and p4
+			const dx = p4.x - p3.x;
+			const dy = p4.y - p3.y;
+
+			const lengthSquared = dx * dx + dy * dy;
+
+			// Vector from p3 to p2
+			const vx = p2.x - p3.x;
+			const vy = p2.y - p3.y;
+
+			// Dot product of (p2 - p3) and (p3 - p4) normalized by the line length squared
+			const dot = (vx * dx + vy * dy) / lengthSquared;
+
+			// Reflection formula: p2' = p2 - 2 * dot * (p3 - p4)
+			const rx = p2.x - 2 * dot * dx;
+			const ry = p2.y - 2 * dot * dy;
+
+			return { x: rx, y: ry };
 		}
 
-		return null;
+		return null; // No intersection
 	}
 
-	// Goal boundary collision detection
+	// bar boundary collision detection
 
-	function checkGoalCollision(x: number, y: number): [number, number] | null {
+	function checkCollision(): [number, number, number, number] | null {
+		let coll =
+			(wallsEnabled &&
+				(intersect(
+					lastPuck,
+					puck,
+					{ x: -WIDTH / 2, y: HEIGHT / 2 },
+					{ x: -WIDTH / 2, y: -HEIGHT / 2 },
+				) ||
+					intersect(
+						lastPuck,
+						puck,
+						{ x: WIDTH / 2, y: HEIGHT / 2 },
+						{ x: WIDTH / 2, y: -HEIGHT / 2 },
+					))) ||
+			// back of the goals
+			intersect(
+				lastPuck,
+				puck,
+				{ x: 300 / 2, y: g_length / 2 },
+				{ x: 300 / 2, y: -g_length / 2 },
+			) ||
+			intersect(
+				lastPuck,
+				puck,
+				{ x: -300 / 2, y: g_length / 2 },
+				{ x: -300 / 2, y: -g_length / 2 },
+			) ||
+			intersect(
+				lastPuck,
+				puck,
+				{ x: -300 / 2 + g_width, y: g_length / 2 },
+				{ x: -300 / 2 + g_width, y: g_length * 0.4 },
+			) ||
+			intersect(
+				lastPuck,
+				puck,
+				{ x: -300 / 2 + g_width, y: -g_length / 2 },
+				{ x: -300 / 2 + g_width, y: -g_length * 0.4 },
+			);
 
-		
-
-		const leftGoalLowerX = -WIDTH/2;
-		const leftGoalUpperX = -WIDTH/2 + g_width;
-		
-		const leftGoalLowerLower = g_length/2; 
-		const leftGoalLowerUpper = g_length/2 + 0.1;
-
-		const leftGoalUpperUpper = -1 * g_length/2 - 0.1;
-		const leftGoalUpperLower = -1 * g_length/2;
-		
-		const rightGoalLowerX = WIDTH/2 - g_width;
-		const rightGoalUpperX = WIDTH/2;
-
-		const rightGoalLowerLower = g_length/2;
-		const rightGoalLowerUpper = g_length/2 + 0.1;
-
-		const rightGoalUpperUpper = -1 * g_length/2 - 0.1;
-		const rightGoalUpperLower = -1 * g_length/2;
-
-		// left goal 
-
-		if (x > leftGoalLowerX && x < leftGoalUpperX && y > leftGoalLowerLower && y < leftGoalLowerUpper) {
-			return [1, -1];
+		if (coll) {
+			console.log(coll);
+			return [coll.x, coll.y, -1, 1];
 		}
-		if (x > leftGoalLowerX && x < leftGoalUpperX && y < leftGoalUpperLower && y > leftGoalUpperUpper) {
-			return [1, -1];
-		}
 
-		// right goal
-
-		if (x > rightGoalLowerX && x < rightGoalUpperX && y > rightGoalLowerLower && y < rightGoalLowerUpper) {
-			return [1, -1];
-		}
-		if (x > rightGoalLowerX && x < rightGoalUpperX && y < rightGoalUpperLower && y > rightGoalUpperUpper) {
-			return [1, -1];
+		coll =
+			(wallsEnabled &&
+				(intersect(
+					lastPuck,
+					puck,
+					{ x: -WIDTH / 2, y: HEIGHT / 2 },
+					{ x: WIDTH / 2, y: HEIGHT / 2 },
+				) ||
+					intersect(
+						lastPuck,
+						puck,
+						{ x: -WIDTH / 2, y: -HEIGHT / 2 },
+						{ x: WIDTH / 2, y: -HEIGHT / 2 },
+					))) ||
+			// sides of the goals
+			intersect(
+				lastPuck,
+				puck,
+				{ x: 300 / 2, y: g_length / 2 },
+				{ x: 300 / 2 - g_width, y: g_length / 2 },
+			) ||
+			intersect(
+				lastPuck,
+				puck,
+				{ x: -300 / 2, y: g_length / 2 },
+				{ x: -300 / 2 + g_width, y: g_length / 2 },
+			) ||
+			intersect(
+				lastPuck,
+				puck,
+				{ x: 300 / 2, y: -g_length / 2 },
+				{ x: 300 / 2 - g_width, y: -g_length / 2 },
+			) ||
+			intersect(
+				lastPuck,
+				puck,
+				{ x: -300 / 2, y: -g_length / 2 },
+				{ x: -300 / 2 + g_width, y: -g_length / 2 },
+			);
+		if (coll) {
+			console.log('vert doink', coll);
+			return [coll.x, coll.y, 1, -1];
 		}
 
 		return null;
@@ -153,8 +207,6 @@
 
 	function onMouseDown(e: MouseEvent, particle: Particle) {
 		e.preventDefault();
-
-	
 
 		function onMouseMove(e: MouseEvent) {
 			// console.log(e.clientY, e.offsetY, svg.clientHeight, e.target);
@@ -189,6 +241,10 @@
 		vx: 0,
 		vy: 0,
 	});
+	const lastPuck: Position = {
+		x: PUCKX,
+		y: PUCKY,
+	};
 
 	//$inspect(puck);
 
@@ -225,30 +281,34 @@
 	let clock = $state(0);
 
 	function checkGoal() {
-		// Check if puck is within goal dimensions
-		if (puck.y > (-g_width)/2 && puck.y < (g_width)/2) {
-			// Check if puck has crossed the goal line
-			if (puck.x >= -WIDTH/2 && puck.x <= -WIDTH/2 + g_width * 0.9) {
-				gameOver = true;
-				winner = 'right';
-				return true;
-			} else if (puck.x <= WIDTH/2 && puck.x >= WIDTH/2 - g_width* 0.9) {
-				gameOver = true;
-				winner = 'left';
-				return true;
-			}
+		if (
+			intersect(
+				lastPuck,
+				puck,
+				{ x: -300 / 2 + g_width * 0.9, y: -g_length * 0.4 },
+				{ x: -300 / 2 + g_width * 0.9, y: g_length * 0.4 },
+			)
+		) {
+			gameOver = true;
+			winner = 'left';
+			return true;
+		} else if (
+			intersect(
+				lastPuck,
+				puck,
+				{ x: 300 / 2 - g_width * 0.9, y: -g_length * 0.4 },
+				{ x: 300 / 2 - g_width * 0.9, y: g_length * 0.4 },
+			)
+		) {
+			gameOver = true;
+			winner = 'right';
+			return true;
 		}
+
 		return false;
 	}
 
 	function updatePuck(dt: number) {
-		// Check for goal before updating
-		if (checkGoal()) {
-			go = false;
-			if (req) cancelAnimationFrame(req);
-			return;
-		}
-
 		// make this adaptive?
 		let runningTime = 0;
 		let v = [puck.x, puck.y, puck.vx, puck.vy];
@@ -266,32 +326,36 @@
 					h,
 				);
 
-				// Check for goal boundary collision
-				const g_collision = checkGoalCollision(v[0], v[1]);
-				if (g_collision) {
-					// Apply bounce with some energy loss
-					const bounceFactor = 1;
-					v[2] *= g_collision[0] * bounceFactor;
-					v[3] *= g_collision[1] * bounceFactor;
+				puck.x = v[0];
+				puck.y = v[1];
+
+				// Check for goal before updating
+				if (checkGoal()) {
+					go = false;
+					if (req) cancelAnimationFrame(req);
+					return;
 				}
 
-				// Check for bar boundary collision
-				const b_collision = checkBarCollision(v[0], v[1]);
-				if (b_collision) {
+				// Check for  boundary collision
+				const collision = checkCollision();
+				if (collision) {
 					// Apply bounce with some energy loss
 					const bounceFactor = 1;
-					v[2] *= b_collision[0] * bounceFactor;
-					v[3] *= b_collision[1] * bounceFactor;
+					puck.x = collision[0];
+					puck.y = collision[1];
+					v[2] *= collision[2] * bounceFactor;
+					v[3] *= collision[3] * bounceFactor;
 				}
 			}
 			ticks += 1;
 		}
-		puck.x = v[0];
-		puck.y = v[1];
+
 		puck.vx = v[2];
 		puck.vy = v[3];
 		puckTrace.push([v[0], v[1]]);
-		if (ticks > 11) console.log('tickss: ', ticks);
+		if (ticks > 11) console.log('ticks: ', ticks);
+		lastPuck.x = puck.x;
+		lastPuck.y = puck.y;
 	}
 
 	function animate(t = 0) {
@@ -340,70 +404,46 @@
 			/>
 		{/if}
 
-
-
 		<!-- Left Goal -->
-		<g transform={`translate(${-WIDTH/2}, ${g_length/2}) scale(${g_scale}) rotate(-90)`}>
-			{@html goalSvg}
-		</g>
+		<Goal x={-300 / 2} y={g_length / 2} scale={g_scale} rot={-90} />
 
 		<!-- Right Goal -->
-		<g transform={`translate(${WIDTH/2}, ${-g_length/2}) scale(${g_scale}) rotate(90)`}>
-			{@html goalSvg}
-		</g>
+		<Goal x={300 / 2} y={-g_length / 2} scale={g_scale} rot={90} />
 
 		{#if wallsEnabled}
 			<!-- Top Wall -->
 			<line
-				x1={-WIDTH/2}
-				y1={-HEIGHT/2}
-				x2={WIDTH/2}
-				y2={-HEIGHT/2}
+				x1={-WIDTH / 2}
+				y1={-HEIGHT / 2}
+				x2={WIDTH / 2}
+				y2={-HEIGHT / 2}
 				stroke="black"
 				stroke-width="4"
 			/>
 			<!-- Bottom Wall -->
 			<line
-				x1={-WIDTH/2}
-				y1={HEIGHT/2}
-				x2={WIDTH/2}
-				y2={HEIGHT/2}
+				x1={-WIDTH / 2}
+				y1={HEIGHT / 2}
+				x2={WIDTH / 2}
+				y2={HEIGHT / 2}
 				stroke="black"
 				stroke-width="4"
 			/>
-			<!-- Left Wall (top) -->
+			<!-- Left Wall -->
 			<line
-				x1={-WIDTH/2}
-				y1={-HEIGHT/2}
-				x2={-WIDTH/2}
-				y2={-g_length/2}
+				x1={-WIDTH / 2}
+				y1={-HEIGHT / 2}
+				x2={-WIDTH / 2}
+				y2={HEIGHT / 2}
 				stroke="black"
 				stroke-width="4"
 			/>
-			<!-- Left Wall (bottom) -->
+			<!-- Right Wall -->
 			<line
-				x1={-WIDTH/2}
-				y1={g_length/2}
-				x2={-WIDTH/2}
-				y2={HEIGHT/2}
-				stroke="black"
-				stroke-width="4"
-			/>
-			<!-- Right Wall (top) -->
-			<line
-				x1={WIDTH/2}
-				y1={-HEIGHT/2}
-				x2={WIDTH/2}
-				y2={-g_length/2}
-				stroke="black"
-				stroke-width="4"
-			/>
-			<!-- Right Wall (bottom) -->
-			<line
-				x1={WIDTH/2}
-				y1={g_length/2}
-				x2={WIDTH/2}
-				y2={HEIGHT/2}
+				x1={WIDTH / 2}
+				y1={-HEIGHT / 2}
+				x2={WIDTH / 2}
+				y2={HEIGHT / 2}
 				stroke="black"
 				stroke-width="4"
 			/>
@@ -426,11 +466,6 @@
 	<div
 		class="flex flex-wrap items-center gap-4 rounded-lg border border-gray-200 bg-gray-50 p-4 shadow-sm"
 	>
-		{#if gameOver}
-			<div class="w-full text-center text-2xl font-bold text-green-600 mb-4">
-				{winner === 'left' ? 'Left' : 'Right'} side wins!
-			</div>
-		{/if}
 		<button
 			class="rounded bg-green-500 px-4 py-2 font-medium text-white transition hover:bg-green-600"
 			onclick={() => {
@@ -449,7 +484,7 @@
 				go = false;
 				gameOver = false;
 				winner = null;
-				puck = { x: PUCKY, y: -PUCKY, vx: 0, vy: 0, charge: 10 };
+				puck = { x: PUCKX, y: PUCKY, vx: 0, vy: 0, charge: 10 };
 				puckTrace = [[PUCKX, PUCKY]];
 			}}
 		>
@@ -554,12 +589,20 @@
 			/>
 		</label>
 	</div>
+	<div>
+		{#if gameOver}
+			<div class="mb-4 w-full text-center text-2xl font-bold text-green-600">
+				{winner === 'left' ? 'Left' : 'Right'} side wins!
+			</div>
+		{/if}
+	</div>
 </div>
 
 <style lang="postcss">
 	@reference "tailwindcss/theme";
 
 	svg {
+		margin: 10px;
 		border: 1px solid black;
 		width: 100vw;
 		max-width: 800px;
