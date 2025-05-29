@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { rk4, leapfrog } from '$lib/mathutils';
 	import { arrow } from './SVGSnippets.svelte';
-	import goalSvg from '$lib/goal.svg?raw';
 	import Goal from './Goal.svelte';
 
 	interface Position {
