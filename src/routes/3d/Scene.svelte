@@ -2,15 +2,26 @@
     import { T } from '@threlte/core'
     import { OrbitControls } from '@threlte/extras'
     import { leapfrog } from '$lib/mathutils3d.js'
+    import { onMount } from 'svelte'
+    import { TransformControls } from '@threlte/extras'
+    import { MeshStandardMaterial, BoxGeometry, Mesh, Vector3} from 'three'
+    import { interactivity } from '@threlte/extras'
+    interactivity()
 
 
-    let {instructions, resetFunc} = $props()
+    // CODE FOR SETUP FROM +page.svelte
+
+    let {instructions, resetFunc, addModeFunc} = $props()
 
     let resetVal = $derived(instructions.reset)
 
-    let particles = $derived(instructions.particles)
+    
 
-    $inspect("instructions: " + instructions)
+
+    let addMode = $derived(instructions.addMode)
+
+
+    //$inspect("instructions: " + instructions)
 
 
     interface Particle {
@@ -36,9 +47,16 @@
         charge: 1
     })
 
+
+  
+    let particles = $state([
+        {x: 0, y: 2, z: 0, charge: -0.001}
+    ])
+
+
     let puckPosition: [number, number, number] = $derived([puck.x, puck.y, puck.z]);
 
-    $inspect("puck pos: " + puckPosition)
+    //$inspect("puck pos: " + puckPosition)
 
 
     let decay = $state(2)
@@ -120,6 +138,8 @@
 
     let showTrace = $state(false)
 
+    // CODE FOR ANIMATION
+
     $effect(() => {
         
         if (go) {
@@ -153,18 +173,35 @@
         }
     })
 
+    // CODE FOR ADDING ELECTRON 
+
+
+    let chargeRef : Mesh | undefined = $state(undefined)
+
+    //$inspect(chargeRef)
+
+    function addParticle([x, y, z] : [number, number, number]) {
+        particles.push({x: x, y: y, z: z, charge: -0.001})
+    }
+
+    
+
+
 </script>
 
 
 
 <!-- Scene contents -->
-<T.PerspectiveCamera makeDefault position={[10, 10, 10]} fov={45}>
+<T.PerspectiveCamera makeDefault position={[15, 15, 15]} fov={45}>
     <OrbitControls target={[0, 0, 0]} enableDamping />
 </T.PerspectiveCamera>
 
 <T.AmbientLight intensity={0.5} />
 <T.DirectionalLight position={[5, 10, 7]} />
 <T.AxesHelper args={[5]} />
+<T.GridHelper args={[20, 20, 'gray', 'lightgray']} rotation={[0, 0, 0]} />
+<T.GridHelper args={[20, 20, 'gray', 'lightgray']} rotation={[Math.PI /2 , 0, 0]} position={[0,10,-10]}/>
+<T.GridHelper args={[20, 20, 'gray', 'lightgray']} rotation={[0 , 0, Math.PI/2]} position={[-10,10,0]}/>
 
 <!-- Render particles -->
 {#each particles as p}
@@ -179,3 +216,47 @@
     <T.SphereGeometry args={[0.25, 32, 32]} />
     <T.MeshStandardMaterial color="black" />
 </T.Mesh>
+
+
+<!--moving charges in 3d space (add mode)-->
+{#if addMode}
+    
+    <!-- charge to be added -->
+    <TransformControls>
+        <T.Mesh
+        bind:ref={chargeRef}
+        geometry={new BoxGeometry()}
+        material={new MeshStandardMaterial()}
+        ondblclick={() => {
+
+            if (chargeRef) {
+                const world = new Vector3()
+                chargeRef.getWorldPosition(world)
+                addParticle([world.x, world.y, world.z])
+            }
+
+       
+
+            addModeFunc()
+          }}
+        />
+
+    </TransformControls>
+
+    
+
+
+
+
+{/if}
+
+
+
+
+
+
+
+
+
+
+

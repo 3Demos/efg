@@ -2,21 +2,21 @@
     import { Canvas } from '@threlte/core'
     import Scene from './Scene.svelte'
 
-    let particles = $state([
-    
-    ])
+  
 
     let isPlaying = $state(false)
     let isReset = $state(false)
+    let addMode = $state(false)
+    
 
-    $inspect("isReset var: " + isReset)
+    //$inspect("isReset var: " + isReset)
 
 
 
 
     function addParticle() {
-        particles.push({x: 0, y: 2, z: 0, charge: -0.001})
-        //console.log(particles)
+        addMode = true
+
     }
 
 
@@ -25,7 +25,7 @@
     function reset() {
         isPlaying=false
         isReset = true
-        particles.length = 0
+
     }
 
 
@@ -34,9 +34,9 @@
 
     // instructions for the scene
     let instructions = $derived({
-        particles: particles,
         play: isPlaying,
-        reset: isReset
+        reset: isReset,
+        addMode: addMode
     })
  
 
@@ -51,12 +51,15 @@
         <button onclick={reset}>reset</button>
         <button onclick={addParticle}>add particle</button>
     </div>
-  </div>
+ </div>
+
+
+  
   
 
 
 <Canvas>
-  <Scene instructions={instructions} resetFunc={() => isReset = false}/>
+  <Scene instructions={instructions} resetFunc={() => isReset = false} addModeFunc={() => addMode = false}/>
 </Canvas>
 
 
@@ -99,8 +102,29 @@
     width: 100%;
     height: 100vh;
     display: block;
-  }
-  </style>
+    }
+
+    :global(html, body) {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+:global(body) {
+    position: relative;
+}
+
+:global(canvas) {
+    width: 100vw;
+    height: 100vh;
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+</style>
 
 
 
