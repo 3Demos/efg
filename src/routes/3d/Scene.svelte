@@ -1,29 +1,29 @@
 <script lang="ts">
     import { T } from '@threlte/core'
-    import { OrbitControls } from '@threlte/extras'
+    import { OrbitControls, 
+        MeshLineMaterial,
+        MeshLineGeometry,
+        TransformControls,
+        interactivity } from '@threlte/extras'
     import { leapfrog } from '$lib/mathutils3d.js'
-    import { onMount } from 'svelte'
-    import { TransformControls } from '@threlte/extras'
-    import { MeshStandardMaterial, BoxGeometry, SphereGeometry, Mesh, Vector3} from 'three'
-    import { interactivity } from '@threlte/extras'
+    import { MeshStandardMaterial, SphereGeometry, Mesh, Vector3, PointsMaterial} from 'three'
     interactivity()
 
 
     // CODE FOR SETUP FROM +page.svelte
 
-    let {instructions, resetFunc, addModeFunc} = $props()
+    let {instructions, resetFunc, addModeFunc, chargeFunc} = $props()
 
     let resetVal = $derived(instructions.reset)
 
-
-
-    
-
-
     let addMode = $derived(instructions.addMode)
 
+    let charge = $derived(instructions.charge)
 
-    //$inspect("instructions: " + instructions)
+    let showTrace = $derived(instructions.showTrace)
+
+
+    $inspect(instructions)
 
 
     interface Particle {
@@ -86,11 +86,13 @@
 	const PUCKY = 0;
     const PUCKZ = 0;
 
-    let puckTrace: [number, number, number][] = $state([[PUCKX, PUCKY, PUCKZ]]);
-	let traceString = $derived(
-		`M${PUCKX},${PUCKY},${PUCKZ} ` +
-			puckTrace.map(([x, y, z]) => `L${x},${y},${z} `).reduce((p = '', c = '') => p + c),
-	);
+    let points: Vector3[] = $state([new Vector3(PUCKX, PUCKY, PUCKZ)]);
+
+
+	// let traceString = $derived(
+	// 	`M${PUCKX},${PUCKY},${PUCKZ} ` +
+	// 		puckTrace.map(([x, y, z]) => `L${x},${y},${z} `).reduce((p = '', c = '') => p + c),
+	// );
 
     let go = $derived(instructions.play)
     let last: number | undefined
@@ -121,7 +123,7 @@
         puck.vy = v[4]
         puck.vz = v[5]
        
-        puckTrace.push([v[0], v[1], v[2]])
+        points.push(new Vector3(v[0], v[1], v[2]))
 
     }
 
@@ -138,8 +140,6 @@
         req = requestAnimationFrame(animate)
     }
 
-    let showTrace = $state(false)
-
     // CODE FOR ANIMATION
 
     $effect(() => {
@@ -147,6 +147,9 @@
         if (go) {
   
             req = requestAnimationFrame(animate)
+            
+
+
         } else if (req) {
             cancelAnimationFrame(req)
             req = undefined
@@ -168,9 +171,9 @@
             puck.vy = 0;
             puck.vz = 0;
             
-            particles.length = 0;
+     
 
-            puckTrace.length = 0;
+            points.length = 0;
             resetVal = false;
             resetFunc();
         }
@@ -191,8 +194,11 @@
             x,
             y,
             z,
-            charge: -0.001
+            charge: charge
         });
+
+        // reset addCharge in +page.svelte to 0
+        chargeFunc()
     }
 
     
@@ -256,12 +262,23 @@
         />
 
     </TransformControls>
+{/if}
 
-    
+<!-- showing trace of puck -->
 
-
-
-
+{#if showTrace && points.length > 1}
+<T.Mesh>
+    <MeshLineGeometry {points} />
+    <MeshLineMaterial
+        width={0.05}
+        color="black"
+        dashArray = {1}
+        dashRatio={0.5}
+        dashOffest = {0}
+        transparent
+        depthTest={false}
+    />
+  </T.Mesh>
 {/if}
 
 

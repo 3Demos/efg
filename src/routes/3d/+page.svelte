@@ -7,25 +7,41 @@
     let isPlaying = $state(false)
     let isReset = $state(false)
     let addMode = $state(false)
+    let addCharge = $state(0)
+    let showTrace = $state(false)
     
 
     //$inspect("isReset var: " + isReset)
 
-    function addParticle() {
+    // function addParticle() {
+    //     addMode = true
+    // }
+
+    function addProton() {
         addMode = true
+        addCharge = 0.001
+    }
+
+    function addElectron() {
+        addMode = true
+        addCharge = -0.001
     }
 
     function reset() {
         isPlaying=false
         isReset = true
-
+        addCharge = 0
+        addMode = false
+        showTrace = false
     }
 
     // instructions for the scene
     let instructions = $derived({
         play: isPlaying,
         reset: isReset,
-        addMode: addMode
+        charge: addCharge,
+        addMode: addMode,
+        showTrace: showTrace
     })
  
 
@@ -38,17 +54,16 @@
         
         <button onclick={() => isPlaying = !isPlaying}>{isPlaying ? 'stop' : 'play'}</button>
         <button onclick={reset}>reset</button>
-        <button onclick={addParticle}>add particle</button>
+        <button onclick={addProton}>add proton</button>
+        <button onclick={addElectron}>add electron</button>
+        <button onclick={() => showTrace = !showTrace}>{showTrace ? 'hide' : 'show'} trace</button>
+        <!-- <button onclick={addParticle}>add particle</button> -->
     </div>
  </div>
 
 
-  
-  
-
-
 <Canvas>
-  <Scene instructions={instructions} resetFunc={() => isReset = false} addModeFunc={() => addMode = false}/>
+  <Scene instructions={instructions} resetFunc={() => isReset = false} addModeFunc={() => addMode = false} chargeFunc={() => addCharge = 0}/>
 </Canvas>
 
 
@@ -80,11 +95,6 @@
     flex-direction: column;
     gap: 0.5rem;
 }
-
-
-
-
-
 
 
     :global(canvas) {
