@@ -201,6 +201,8 @@
         chargeFunc()
     }
 
+
+
     
 
 
@@ -209,7 +211,7 @@
 
 
 <!-- Scene contents -->
-<T.PerspectiveCamera makeDefault position={[15, 15, 15]} fov={45}>
+<T.PerspectiveCamera makeDefault position={[20, 10, 15]} fov={45}>
     <OrbitControls target={[0, 0, 0]} enableDamping />
 </T.PerspectiveCamera>
 
@@ -227,7 +229,7 @@
         ondblclick={() => {
             particles = particles.filter(part => part.id !== p.id)
         }}>
-        <T.SphereGeometry args={[0.3, 32, 32]} />
+        <T.SphereGeometry args={[0.25, 32, 32]} />
         <T.MeshStandardMaterial color={p.charge > 0 ? 'red' : 'blue'} />
     </T.Mesh>
 {/each}
@@ -244,24 +246,22 @@
 {#if addMode}
     
     <!-- charge to be added -->
-    <TransformControls>
-        <T.Mesh
-        bind:ref={chargeRef}
-        geometry={new SphereGeometry()}
-        material={new MeshStandardMaterial()}
-        ondblclick={() => {
-
-            if (chargeRef) {
-                const world = new Vector3()
-                chargeRef.getWorldPosition(world)
-                addParticle([world.x, world.y, world.z])
-            }
-
-            addModeFunc()
-          }}
-        />
-
-    </TransformControls>
+<TransformControls>
+    <T.Mesh
+      bind:ref={chargeRef}
+      ondblclick={() => {
+        if (chargeRef) {
+          const world = new Vector3()
+          chargeRef.getWorldPosition(world)
+          addParticle([world.x, world.y, world.z])
+        }
+        addModeFunc()
+      }}
+    >
+      <T.SphereGeometry args={[0.3, 32, 32]} />
+      <T.MeshStandardMaterial />
+    </T.Mesh>
+  </TransformControls>
 {/if}
 
 <!-- showing trace of puck -->

@@ -2,8 +2,6 @@
     import { Canvas } from '@threlte/core'
     import Scene from './Scene.svelte'
 
-  
-
     let isPlaying = $state(false)
     let isReset = $state(false)
     let addMode = $state(false)
@@ -43,7 +41,6 @@
         addMode: addMode,
         showTrace: showTrace
     })
- 
 
 </script>
 
