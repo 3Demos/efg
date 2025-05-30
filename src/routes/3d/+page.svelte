@@ -1,20 +1,12 @@
 <script lang="ts">
     import { Canvas } from '@threlte/core'
     import Scene from './Scene.svelte'
-	import { xor } from 'three/tsl';
 
     let isPlaying = $state(false)
     let isReset = $state(false)
     let addMode = $state(false)
     let addCharge = $state(0)
     let showTrace = $state(false)
-    
-
-    //$inspect("isReset var: " + isReset)
-
-    // function addParticle() {
-    //     addMode = true
-    // }
 
     function addProton() {
         resetNewParticleCoords()
@@ -38,6 +30,9 @@
         addCharge = 0
         addMode = false
         showTrace = false
+        confirmAddChoice = false
+        resetNewParticleCoords()
+
     }
 
 
@@ -182,35 +177,38 @@
     justify-content: center; /* optional: center-align buttons */
 }
 
-
 .interactive-content {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 0.5rem;
+  width: 100%;
 }
 
 .label {
   font-weight: bold;
   min-width: 80px;
-
+  text-align: left;
 }
 
 .form-fields {
-  flex: 1;
+
   display: flex;
   gap: 0.5rem;
-  flex-wrap: wrap;
+  justify-content: center;
+  flex-grow: 1;
 }
 
 .form-fields input {
+    
   width: 60px;
   padding: 0.25rem;
   font-size: 0.9rem;
+  justify-content:center;
+
 }
 
 .form-fields button {
-  padding: 0.25rem 0.5rem;
-  font-size: 0.9rem;
+  margin-left: auto;
 }
 
 
