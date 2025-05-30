@@ -12,7 +12,7 @@
 
     // CODE FOR SETUP FROM +page.svelte
 
-    let {instructions, resetFunc, addModeFunc, chargeFunc} = $props()
+    let {instructions, resetFunc, addModeFunc, chargeFunc, resetNewParticleCoords, modifyNewParticleCoords} = $props()
 
     let resetVal = $derived(instructions.reset)
 
@@ -22,6 +22,9 @@
 
     let showTrace = $derived(instructions.showTrace)
 
+    let newParticleCoords = $derived(instructions.newParticleCoords)
+
+    let confirmAddChoice = $derived(instructions.confirmAddChoice)
 
     $inspect(instructions)
 
@@ -179,7 +182,8 @@
         }
     })
 
-    // CODE FOR ADDING ELECTRON 
+    // CODE FOR ADDING PARTICLES
+
 
 
     let chargeRef : Mesh | undefined = $state(undefined)
@@ -200,6 +204,42 @@
         // reset addCharge in +page.svelte to 0
         chargeFunc()
     }
+
+
+
+    // runs when user confirms add and gets world position of object at the end
+
+    function confirmAdd() {
+        resetNewParticleCoords()
+        if (chargeRef) {
+            const world = new Vector3()
+            chargeRef.getWorldPosition(world)
+            addParticle([world.x, world.y, world.z])
+        }
+        addModeFunc()
+        newParticleCoords = [0,0,0]
+    }
+
+    $effect(() => {
+        if (confirmAddChoice) {
+            confirmAdd()
+            confirmAddChoice = false // redundant but for good measure
+        }
+    })
+
+
+
+
+
+
+
+        
+
+
+
+
+ 
+
 
 
 
@@ -246,17 +286,19 @@
 {#if addMode}
     
     <!-- charge to be added -->
-<TransformControls>
-    <T.Mesh
-      bind:ref={chargeRef}
-      ondblclick={() => {
+<TransformControls 
+    position = {newParticleCoords}
+    onchange={() => {
         if (chargeRef) {
-          const world = new Vector3()
-          chargeRef.getWorldPosition(world)
-          addParticle([world.x, world.y, world.z])
+            const world = new Vector3()
+            chargeRef.getWorldPosition(world)
+            modifyNewParticleCoords([world.x, world.y, world.z])
         }
-        addModeFunc()
-      }}
+    }}
+    >
+    <T.Mesh
+        bind:ref={chargeRef}
+        ondblclick={confirmAdd}
     >
       <T.SphereGeometry args={[0.3, 32, 32]} />
       <T.MeshStandardMaterial />
