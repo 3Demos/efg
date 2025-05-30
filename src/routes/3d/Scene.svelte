@@ -4,7 +4,7 @@
     import { leapfrog } from '$lib/mathutils3d.js'
     import { onMount } from 'svelte'
     import { TransformControls } from '@threlte/extras'
-    import { MeshStandardMaterial, BoxGeometry, Mesh, Vector3} from 'three'
+    import { MeshStandardMaterial, BoxGeometry, SphereGeometry, Mesh, Vector3} from 'three'
     import { interactivity } from '@threlte/extras'
     interactivity()
 
@@ -14,6 +14,8 @@
     let {instructions, resetFunc, addModeFunc} = $props()
 
     let resetVal = $derived(instructions.reset)
+
+
 
     
 
@@ -50,8 +52,8 @@
 
   
     let particles = $state([
-        {x: 0, y: 2, z: 0, charge: -0.001}
-    ])
+        { id: 1, x: 0, y: 2, z: 0, charge: -0.001 }
+    ])  
 
 
     let puckPosition: [number, number, number] = $derived([puck.x, puck.y, puck.z]);
@@ -165,7 +167,8 @@
             puck.vx = 0;
             puck.vy = 0;
             puck.vz = 0;
-
+            
+            particles.length = 0;
 
             puckTrace.length = 0;
             resetVal = false;
@@ -180,8 +183,16 @@
 
     //$inspect(chargeRef)
 
-    function addParticle([x, y, z] : [number, number, number]) {
-        particles.push({x: x, y: y, z: z, charge: -0.001})
+    let particle_num = $derived(particles.length > 0 ? particles[particles.length - 1].id + 1: 1)
+
+    function addParticle([x, y, z]: [number, number, number]) {
+        particles.push({
+            id: particle_num, 
+            x,
+            y,
+            z,
+            charge: -0.001
+        });
     }
 
     
@@ -204,12 +215,17 @@
 <T.GridHelper args={[20, 20, 'gray', 'lightgray']} rotation={[0 , 0, Math.PI/2]} position={[-10,10,0]}/>
 
 <!-- Render particles -->
-{#each particles as p}
-    <T.Mesh position={[p.x, p.y, p.z]}>
+{#each particles as p (p.id)}
+    <T.Mesh
+        position={[p.x, p.y, p.z]}
+        ondblclick={() => {
+            particles = particles.filter(part => part.id !== p.id)
+        }}>
         <T.SphereGeometry args={[0.3, 32, 32]} />
         <T.MeshStandardMaterial color={p.charge > 0 ? 'red' : 'blue'} />
     </T.Mesh>
 {/each}
+
 
 <!-- Render puck -->
 <T.Mesh position={puckPosition}>
@@ -225,7 +241,7 @@
     <TransformControls>
         <T.Mesh
         bind:ref={chargeRef}
-        geometry={new BoxGeometry()}
+        geometry={new SphereGeometry()}
         material={new MeshStandardMaterial()}
         ondblclick={() => {
 
@@ -234,8 +250,6 @@
                 chargeRef.getWorldPosition(world)
                 addParticle([world.x, world.y, world.z])
             }
-
-       
 
             addModeFunc()
           }}

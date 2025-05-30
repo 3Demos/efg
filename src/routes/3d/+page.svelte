@@ -11,26 +11,15 @@
 
     //$inspect("isReset var: " + isReset)
 
-
-
-
     function addParticle() {
         addMode = true
-
     }
-
-
-
 
     function reset() {
         isPlaying=false
         isReset = true
 
     }
-
-
-    
-
 
     // instructions for the scene
     let instructions = $derived({
