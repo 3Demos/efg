@@ -179,7 +179,7 @@
      
 
             points.length = 0;
-            particles.length = 0;
+            //particles.length = 0;
             resetVal = false;
             resetFunc();
         }
