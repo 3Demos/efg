@@ -7,12 +7,12 @@
     let addMode = $state(false)
     let addCharge = $state(0)
     let showTrace = $state(false)
+    let showVf = $state(true)
 
     function addProton() {
         resetNewParticleCoords()
         addMode = true
         addCharge = 0.001
-
         activePane = 'proton'
     }
 
@@ -20,7 +20,6 @@
         resetNewParticleCoords()
         addMode = true
         addCharge = -0.001
-
         activePane = 'electron'
     }
 
@@ -31,9 +30,12 @@
         addMode = false
         showTrace = false
         confirmAddChoice = false
+        activePane = ''
+        showVf = true
         resetNewParticleCoords()
-
     }
+
+
 
 
 
@@ -48,6 +50,7 @@
     let newParticleZ: number | null = $state(null)
 
     let newParticleCoords = $derived([newParticleX, newParticleY, newParticleZ])
+
     
     let confirmAddChoice = $state(false)
 
@@ -87,7 +90,8 @@
         addMode: addMode,
         showTrace: showTrace,
         newParticleCoords: newParticleCoords,
-        confirmAddChoice: confirmAddChoice
+        confirmAddChoice: confirmAddChoice,
+        showVf : showVf
     })
 
 
@@ -105,6 +109,7 @@
         <button onclick={addProton}>add proton</button>
         <button onclick={addElectron}>add electron</button>
         <button onclick={() => showTrace = !showTrace}>{showTrace ? 'hide' : 'show'} trace</button>
+        <button onclick={() => showVf = !showVf}>{showVf ? 'hide' : 'show'} vector field</button>
         <!-- <button onclick={addParticle}>add particle</button> -->
 
         {:else}
@@ -112,7 +117,7 @@
             {#if addMode}
             <div class="interactive-content">
                 <span class="label">
-                {#if activePane === 'proton'}Add Proton{:else if activePane === 'electron'}Add Electron{/if}
+                {#if activePane === 'proton'}add proton{:else if activePane === 'electron'}add electron{/if}
                 </span>
                 <div class="form-fields">
                 {#if activePane === 'proton' || activePane === 'electron'}
@@ -120,8 +125,11 @@
                     <input bind:value={newParticleY} type="number" placeholder={newParticleDisplayY}  />
                     <input bind:value={newParticleZ} type="number" placeholder={newParticleDisplayZ}  />
                 {/if}
-                <button onclick={() => {activePane = ''; confirmAddChoice = true}}>Done</button>
                 </div>
+                <div class="form-submit">
+                    <button onclick={() => {activePane = ''; confirmAddChoice = true}}>done</button>
+                </div>
+                
             </div>
 
             {/if}
@@ -142,8 +150,7 @@
   addModeFunc={() => {addMode = false; confirmAddChoice = false}} 
   chargeFunc={() => addCharge = 0}
   resetNewParticleCoords={resetNewParticleCoords} 
-  modifyNewParticleCoords = {modifyNewParticleCoords}
-  
+  modifyNewParticleCoords = {modifyNewParticleCoords} 
   />
 </Canvas>
 
@@ -155,7 +162,7 @@
     bottom: 3em;
     left: 50%;
     transform: translateX(-50%);
-    width: 500px;
+    width: 650px;
     background-color: white; /* changed from #222 */
     color: black; /* updated for contrast on white */
     border-radius: 8px;
@@ -180,18 +187,17 @@
 .interactive-content {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-content: center;
   width: 100%;
+  margin: 0 10px 0 10px;
 }
 
 .label {
-  font-weight: bold;
+  font-style: normal;
   min-width: 80px;
-  text-align: left;
 }
 
 .form-fields {
-
   display: flex;
   gap: 0.5rem;
   justify-content: center;
@@ -200,16 +206,15 @@
 
 .form-fields input {
     
-  width: 60px;
+  width: 80px;
   padding: 0.25rem;
   font-size: 0.9rem;
   justify-content:center;
 
+
 }
 
-.form-fields button {
-  margin-left: auto;
-}
+
 
 
 

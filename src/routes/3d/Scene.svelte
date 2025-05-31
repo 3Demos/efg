@@ -6,7 +6,7 @@
         TransformControls,
         interactivity } from '@threlte/extras'
     import { leapfrog } from '$lib/mathutils3d.js'
-    import { MeshStandardMaterial, SphereGeometry, Mesh, Vector3, PointsMaterial} from 'three'
+    import { MeshStandardMaterial, SphereGeometry, Mesh, Vector3, PointsMaterial, Color, Quaternion } from 'three'
     interactivity()
 
 
@@ -25,6 +25,8 @@
     let newParticleCoords = $derived(instructions.newParticleCoords)
 
     let confirmAddChoice = $derived(instructions.confirmAddChoice)
+
+    let showVf = $derived(instructions.showVf)
 
     $inspect(instructions)
 
@@ -185,8 +187,6 @@
 
     // CODE FOR ADDING PARTICLES
 
-
-
     let chargeRef : Mesh | undefined = $state(undefined)
 
     //$inspect(chargeRef)
@@ -226,25 +226,69 @@
             confirmAdd()
             confirmAddChoice = false // redundant but for good measure
         }
-    })
+    })  
 
 
+    // vector field for particles (defined in 10 x 10 x 10 grid)
+
+    type Vec3 = [number, number, number];
+
+    let fieldPoints: Vec3[] = $state([]);
+    let FIELD_STEP = 2;
+    let FIELD_BOUND = 11;
+
+    for (let x = -FIELD_BOUND; x <= FIELD_BOUND; x += FIELD_STEP) {
+        for (let y = 0; y <= 2 * FIELD_BOUND; y += FIELD_STEP) {
+            for (let z = -FIELD_BOUND; z <= FIELD_BOUND; z += FIELD_STEP) {
+                fieldPoints.push([x, y, z]);
+            }
+        }
+    }
 
 
+    let vectorField: {
+        shaftPos: [number, number, number],
+        headPos: [number, number, number],
+        quaternion: [number, number, number, number],
+        length: number,
+        opacity: number
+    }[] = $derived.by(() =>
+        fieldPoints.map(([x, y, z]) => {
+            const [fx, fy, fz] = vf(x, y, z);
+            const fieldMag = Math.hypot(fx, fy, fz);
+            const scale = 1.5 / (fieldMag || 1);
+            const dir = new Vector3(fx, fy, fz).multiplyScalar(scale);
+            const dirNorm = dir.clone().normalize();
 
+            const originVec = new Vector3(x, y, z);
+            const shaftPos = originVec.clone().add(dirNorm.clone().multiplyScalar(dir.length() * 0.4));
+            const headPos = originVec.clone().add(dirNorm.clone().multiplyScalar(dir.length()));
 
+            const defaultDir = new Vector3(0, 1, 0); // default cylinder up
+            const quaternion = new Quaternion().setFromUnitVectors(defaultDir, dirNorm).toArray() as [number,number,number,number];
 
-        
+            // distance-based opacity
+            let minDist = Infinity;
+            for (const p of particles) {
+                const dx = x - p.x;
+                const dy = y - p.y;
+                const dz = z - p.z;
+                const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                if (dist < minDist) minDist = dist;
+            }
 
+            const opacity = Math.min(1, 5 / (minDist ** 2 + 0.1));
 
+            return {
+                shaftPos: shaftPos.toArray() as [number, number, number],
+                headPos: headPos.toArray() as [number, number, number],
+                quaternion,
+                length: dir.length(),
+                opacity
+            };
+        })
+    );
 
-
- 
-
-
-
-
-    
 
 
 </script>
@@ -289,7 +333,9 @@
     <!-- charge to be added -->
 <TransformControls 
     position = {newParticleCoords}
+
     onchange={() => {
+
         if (chargeRef) {
             const world = new Vector3()
             chargeRef.getWorldPosition(world)
@@ -326,11 +372,21 @@
 
 
 
+<!-- vector field for particles -->
+ {#if showVf}
 
+    {#each vectorField as { shaftPos, headPos, quaternion, length, opacity }, i (i)}
+        <!-- Shaft -->
+        <T.Mesh position={shaftPos} quaternion={quaternion}>
+            <T.CylinderGeometry args={[0.02, 0.02, length * 0.8, 8]} />
+            <T.MeshBasicMaterial color={0xffcc00} transparent opacity={opacity} />
+        </T.Mesh>
 
+        <!-- Arrowhead -->
+        <T.Mesh position={headPos} quaternion={quaternion}>
+            <T.ConeGeometry args={[0.05, length * 0.2, 8]} />
+            <T.MeshBasicMaterial color={0xffcc00} transparent opacity={opacity} />
+        </T.Mesh>
+    {/each}
 
-
-
-
-
-
+{/if}
