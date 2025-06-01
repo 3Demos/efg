@@ -28,7 +28,15 @@
   let stepCount = 0;
   const timeStep = 0.016;
 
-  // Predefined positions
+  let isDragging = false;
+  let draggedCharge: Charge | null = null;
+  let raycaster = new THREE.Raycaster();
+  let mouse = new THREE.Vector2();
+  let dragPlane = new THREE.Plane();
+  let dragPoint = new THREE.Vector3();
+  const dragRange = 5;
+
+  // predefined positions
   const bluePositions = [new THREE.Vector3(3,0,0),new THREE.Vector3(3,0,2),new THREE.Vector3(3,0,-2),
     new THREE.Vector3(3,0,4), new THREE.Vector3(3,0,-4),new THREE.Vector3(5,0,0),
   ];
@@ -53,6 +61,11 @@
     controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
 
+    canvas.addEventListener('mousedown', onMouseDown);
+    canvas.addEventListener('mousemove', onMouseMove);
+    canvas.addEventListener('mouseup', onMouseUp);
+    canvas.addEventListener('dblclick', onDoubleClick);
+
     createPuck();
     addBlueCharge();
     addRedCharge();
@@ -60,6 +73,70 @@
 
     controls.update();
     renderer.render(scene,camera);
+  }
+
+  function onMouseDown(event: MouseEvent) {
+    const rect = canvas.getBoundingClientRect();
+    mouse.x = ((event.clientX - rect.left) / canvas.clientWidth) * 2 - 1;
+    mouse.y = -((event.clientY - rect.top) / canvas.clientHeight) * 2 + 1;
+
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObjects(charges.map(c => c.mesh));
+
+    if (intersects.length > 0) {
+      isDragging = true;
+      draggedCharge = charges.find(c => c.mesh === intersects[0].object) || null;
+      if (draggedCharge) {
+        dragPlane.setFromNormalAndCoplanarPoint(
+          camera.getWorldDirection(dragPlane.normal),
+          draggedCharge.position
+        );
+        controls.enabled = false;
+      }
+    }
+  }
+
+  function onMouseMove(event: MouseEvent) {
+    if (!isDragging || !draggedCharge) return;
+
+    const rect = canvas.getBoundingClientRect();
+    mouse.x = ((event.clientX - rect.left) / canvas.clientWidth) * 2 - 1;
+    mouse.y = -((event.clientY - rect.top) / canvas.clientHeight) * 2 + 1;
+
+    raycaster.setFromCamera(mouse, camera);
+    raycaster.ray.intersectPlane(dragPlane, dragPoint);
+
+    dragPoint.x = Math.max(-dragRange, Math.min(dragRange, dragPoint.x));
+    dragPoint.y = Math.max(-dragRange, Math.min(dragRange, dragPoint.y));
+    dragPoint.z = Math.max(-dragRange, Math.min(dragRange, dragPoint.z));
+
+    draggedCharge.position.copy(dragPoint);
+    draggedCharge.mesh.position.copy(dragPoint);
+    updateStreamlines();
+  }
+
+  function onMouseUp() {
+    isDragging = false;
+    draggedCharge = null;
+    controls.enabled = true;
+  }
+
+  function onDoubleClick(event: MouseEvent) {
+    const rect = canvas.getBoundingClientRect();
+    mouse.x = ((event.clientX - rect.left) / canvas.clientWidth) * 2 - 1;
+    mouse.y = -((event.clientY - rect.top) / canvas.clientHeight) * 2 + 1;
+
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObjects(charges.map(c => c.mesh));
+
+    if (intersects.length > 0) {
+      const chargeToDelete = charges.find(c => c.mesh === intersects[0].object);
+      if (chargeToDelete) {
+        scene.remove(chargeToDelete.mesh);
+        charges = charges.filter(c => c !== chargeToDelete);
+        updateStreamlines();
+      }
+    }
   }
 
   function animate() {
@@ -107,13 +184,22 @@
     return dirs;
   }
 
-  // Add a small arrow mesh at pos in direction dir
   function addArrowMesh(pos: THREE.Vector3, dir: THREE.Vector3) {
     const shaftLen = 0.2;
     const headLen = 0.1;
     const shaftRad = 0.02;
     const headRad = 0.06;
-    const mat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+
+    const fieldStrength = computeFieldAt(pos).length();
+    const normalizedStrength = Math.min(fieldStrength / 10, 1);
+    // contrast--to increase the contrast arrow's color
+    const contrastStrength = Math.pow(normalizedStrength, 0.5);
+    const color = new THREE.Color(
+      0.1 + contrastStrength * 0.9,  // lighter gray (0.1) to black (1.0)
+      0.1 + contrastStrength * 0.9,
+      0.1 + contrastStrength * 0.9
+    );
+    const mat = new THREE.MeshBasicMaterial({ color });
 
     const shaftGeo = new THREE.CylinderGeometry(shaftRad, shaftRad, shaftLen, 8);
     const shaft = new THREE.Mesh(shaftGeo, mat);
@@ -130,9 +216,7 @@
     arrowHelpers.push(head);
   }
 
-  // update streamline emanating from positive charges
   function updateStreamlines() {
-    // clear old
     arrowHelpers.forEach(o => scene.remove(o)); arrowHelpers = [];
     streamlineLines.forEach(l => scene.remove(l)); streamlineLines = [];
 
@@ -152,8 +236,6 @@
           const d = E.normalize().multiplyScalar(stepSize);
           pos = pos.clone().add(d);
           points.push(pos.clone());
-
-          // stop near negative charges
           if (charges.some(c => c.type === 'negative' && pos.distanceTo(c.position) < 0.3)) break;
         }
 
@@ -164,7 +246,6 @@
         scene.add(line);
         streamlineLines.push(line);
 
-        // arrows along line
         for (let k = 3; k < points.length; k += 6) {
           const p0 = points[k-1]; const p1 = points[k];
           addArrowMesh(p0, p1.clone().sub(p0).normalize());
@@ -298,6 +379,10 @@
 
   onDestroy(() => {
     if (animationId) cancelAnimationFrame(animationId);
+    canvas.removeEventListener('mousedown', onMouseDown);
+    canvas.removeEventListener('mousemove', onMouseMove);
+    canvas.removeEventListener('mouseup', onMouseUp);
+    canvas.removeEventListener('dblclick', onDoubleClick);
   });
 </script>
 
