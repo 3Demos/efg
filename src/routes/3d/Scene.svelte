@@ -12,7 +12,7 @@
 
     // CODE FOR SETUP FROM +page.svelte
 
-    let {instructions, resetFunc, addModeFunc, chargeFunc, resetNewParticleCoords, modifyNewParticleCoords} = $props()
+    let {instructions, addModeFunc, chargeFunc, resetNewParticleCoords, modifyNewParticleCoords} = $props()
 
     let resetVal = $derived(instructions.reset)
 
@@ -167,7 +167,7 @@
             if (req) cancelAnimationFrame(req);
             clock = 0;
             last = undefined;
-            go = false;
+      
             // cannot reassign to puck var, must mutate fields
             puck.x = 0;
             puck.y = 0;
@@ -181,7 +181,7 @@
             points.length = 0;
             //particles.length = 0;
             resetVal = false;
-            resetFunc();
+      
         }
     })
 
@@ -227,6 +227,26 @@
             confirmAddChoice = false // redundant but for good measure
         }
     })  
+
+
+    // CODE FOR EDITING PARTICLES
+
+    let editMode = $state(false)
+    
+
+    $effect(() => {
+        if (editMode) {
+            document.body.style.cursor = 'grabbing'
+            $inspect("edit mode")
+        } else {
+            document.body.style.cursor = 'default'
+            $inspect("not edit mode")
+        }
+    })
+
+
+
+
 
 
     // vector field for particles (defined in 10 x 10 x 10 grid)
@@ -291,6 +311,10 @@
 
 
 
+
+
+
+
 </script>
 
 
@@ -313,7 +337,11 @@
         position={[p.x, p.y, p.z]}
         ondblclick={() => {
             particles = particles.filter(part => part.id !== p.id)
-        }}>
+        }}
+        
+        onmousedown={() => editMode = true}
+        onmouseup={() => editMode = false}>
+
         <T.SphereGeometry args={[0.25, 32, 32]} />
         <T.MeshStandardMaterial color={p.charge > 0 ? 'red' : 'blue'} />
     </T.Mesh>

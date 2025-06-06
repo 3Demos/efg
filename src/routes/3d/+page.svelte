@@ -104,7 +104,7 @@
 
         {#if !activePane || !addMode}
         
-        <button onclick={() => isPlaying = !isPlaying}>{isPlaying ? 'stop' : 'play'}</button>
+        <button onclick={() => {isPlaying = !isPlaying; isReset = false}}>{isPlaying ? 'stop' : 'play'}</button>
         <button onclick={reset}>reset</button>
         <button onclick={addProton}>add proton</button>
         <button onclick={addElectron}>add electron</button>
@@ -146,7 +146,7 @@
 <Canvas>
   <Scene 
   instructions={instructions} 
-  resetFunc={() => isReset = false} 
+
   addModeFunc={() => {addMode = false; confirmAddChoice = false}} 
   chargeFunc={() => addCharge = 0}
   resetNewParticleCoords={resetNewParticleCoords} 
