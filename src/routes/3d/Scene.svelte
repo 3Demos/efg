@@ -10,6 +10,13 @@
     interactivity()
 
 
+    // onclick={() => {
+    //         particles = particles.filter(part => part.id !== p.id)
+    //         addMode = true
+    //         newParticleCoords = [p.x, p.y, p.z]
+    //     }}
+
+
     // CODE FOR SETUP FROM +page.svelte
 
     let {instructions, addModeFunc, chargeFunc, resetNewParticleCoords, modifyNewParticleCoords} = $props()
@@ -179,8 +186,12 @@
      
 
             points.length = 0;
-            //particles.length = 0;
-            resetVal = false;
+   
+            particles = [{ id: 1, x: 0, y: 2, z: 0, charge: -0.001 }]
+      
+
+            //resetVal = false;
+           
       
         }
     })
@@ -229,24 +240,12 @@
     })  
 
 
+
     // CODE FOR EDITING PARTICLES
 
     let editMode = $state(false)
+
     
-
-    $effect(() => {
-        if (editMode) {
-            document.body.style.cursor = 'grabbing'
-            $inspect("edit mode")
-        } else {
-            document.body.style.cursor = 'default'
-            $inspect("not edit mode")
-        }
-    })
-
-
-
-
 
 
     // vector field for particles (defined in 10 x 10 x 10 grid)
@@ -311,10 +310,6 @@
 
 
 
-
-
-
-
 </script>
 
 
@@ -339,8 +334,11 @@
             particles = particles.filter(part => part.id !== p.id)
         }}
         
-        onmousedown={() => editMode = true}
-        onmouseup={() => editMode = false}>
+       
+       
+       >
+
+        
 
         <T.SphereGeometry args={[0.25, 32, 32]} />
         <T.MeshStandardMaterial color={p.charge > 0 ? 'red' : 'blue'} />
