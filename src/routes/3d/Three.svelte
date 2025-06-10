@@ -1,11 +1,40 @@
+<script lang="ts" context="module">
+  import { Line2 } from 'three/examples/jsm/lines/Line2.js';
+  import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
+  import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js';
+  
+  export interface ThreeComponent {
+    play: () => void;
+    pause: () => void;
+    reset: () => void;
+    setPuckCharge: (charge: number) => void;
+    setDecayRate: (rate: number) => void;
+    setShowTrace: (show: boolean) => void;
+    addBlueCharge: () => void;
+    addRedCharge: () => void;
+  }
+</script>
+
 <script lang="ts">
   import { onMount, onDestroy, createEventDispatcher } from 'svelte';
   import * as THREE from 'three';
   import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
-  export let decayRate: number = 2;
-  export let puckCharge: number = 10;
-  export let showTrace: boolean = false;
+  let isPlaying = $state(false);
+  let stepCount = $state(0);
+  let puckCharge = $state(10);
+  let decayRate = $state(2);
+  let showTrace = $state(true);
+
+  let puckPosition = $state(new THREE.Vector3(0, 0, 0));
+  let puckVelocity = $state(new THREE.Vector3(0, 0, 0));
+  let puckMesh: THREE.Mesh;
+  let tracePoints: THREE.Vector3[] = $state([]);
+  let traceLine: Line2 | null = null;
+  let traceMaterial: LineMaterial | null = null;
+  const mass = 1.0;
+  const k = 1.0;
+  const minD = 0.1;
 
   let canvas: HTMLCanvasElement;
   let renderer: THREE.WebGLRenderer;
@@ -18,15 +47,9 @@
   let charges: Charge[] = [];
   let arrowHelpers: THREE.Object3D[] = [];
   let streamlineLines: THREE.Object3D[] = [];
-  let puckMesh: THREE.Mesh;
-  let puckVelocity = new THREE.Vector3();
-  let tracePoints: THREE.Vector3[] = [];
-  let traceLine: THREE.Line | null = null;
 
-  let isPlaying = false;
   let animationId: number | null = null;
-  let stepCount = 0;
-  const timeStep = 0.016;
+  const timeStep = 0.008;
 
   let isDragging = false;
   let draggedCharge: Charge | null = null;
@@ -35,16 +58,11 @@
   let dragPlane = new THREE.Plane();
   let dragPoint = new THREE.Vector3();
   const dragRange = 5;
-
   // predefined positions
   const bluePositions = [new THREE.Vector3(3,0,0),new THREE.Vector3(3,0,2),new THREE.Vector3(3,0,-2),
-    new THREE.Vector3(3,0,4), new THREE.Vector3(3,0,-4),new THREE.Vector3(5,0,0),
-  ];
+    new THREE.Vector3(3,0,4), new THREE.Vector3(3,0,-4),new THREE.Vector3(5,0,0),];
   const redPositions  = [new THREE.Vector3(-3,0,0),new THREE.Vector3(-3,0,2),new THREE.Vector3(-3,0,-2),
-  new THREE.Vector3(-3,0,4), 
-  new THREE.Vector3(-3,0,-4),
-  new THREE.Vector3(-5,0,0),
-  ];
+  new THREE.Vector3(-3,0,4), new THREE.Vector3(-3,0,-4),new THREE.Vector3(-5,0,0),];
   let blueIndex = 0;
   let redIndex  = 0;
 
@@ -60,7 +78,6 @@
     camera.position.set(10, 10, 10);
     controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
-
     canvas.addEventListener('mousedown', onMouseDown);
     canvas.addEventListener('mousemove', onMouseMove);
     canvas.addEventListener('mouseup', onMouseUp);
@@ -79,7 +96,6 @@
     const rect = canvas.getBoundingClientRect();
     mouse.x = ((event.clientX - rect.left) / canvas.clientWidth) * 2 - 1;
     mouse.y = -((event.clientY - rect.top) / canvas.clientHeight) * 2 + 1;
-
     raycaster.setFromCamera(mouse, camera);
     const intersects = raycaster.intersectObjects(charges.map(c => c.mesh));
 
@@ -147,29 +163,30 @@
     renderer.render(scene, camera);
     animationId = requestAnimationFrame(animate);
   }
-//puck mesh creation
+
   function createPuck() {
     const geom = new THREE.SphereGeometry(0.1, 16, 16);
     const mat  = new THREE.MeshBasicMaterial({ color: 0x000000 });
     puckMesh = new THREE.Mesh(geom, mat);
-    puckMesh.position.set(0, 0.1, 0);
+    puckPosition = new THREE.Vector3(0, Math.random() * 2 - 1, 0);
+    puckMesh.position.copy(puckPosition);
     scene.add(puckMesh);
   }
- //compute electric field vector at a random point
-  function computeFieldAt(pt: THREE.Vector3) {
+
+  function computeFieldAt(pt: THREE.Vector3): THREE.Vector3 {
     const E = new THREE.Vector3();
-    for (const ch of charges) {
-      const rVec = pt.clone().sub(ch.position);
+    for (const c of charges) {
+      const rVec = pt.clone().sub(c.position);
       const r = rVec.length();
-      if (r < 0.2) continue;
-      const mod = r < 2 ? Math.pow(r / 2, 2) : 1;
-      const magnitude = (10 * (ch.type === 'positive' ? 1 : -1)) / Math.pow(r, decayRate + 1);
-      E.add(rVec.normalize().multiplyScalar(magnitude * mod));
+      const dir = rVec.normalize();
+      const R = Math.max(r, minD);
+      const sign = (c.type === 'positive' ? 1 : -1);
+      const mag = sign*k/(R*R)
+      E.addScaledVector(dir, mag);
     }
     return E;
   }
 
-  // generate directions on a sphere
   function sampleSphereDirections(n: number): THREE.Vector3[] {
     const dirs: THREE.Vector3[] = [];
     for (let i = 0; i < n; i++) {
@@ -189,25 +206,21 @@
     const headLen = 0.1;
     const shaftRad = 0.02;
     const headRad = 0.06;
-
     const fieldStrength = computeFieldAt(pos).length();
     const normalizedStrength = Math.min(fieldStrength / 10, 1);
-    // contrast--to increase the contrast arrow's color
     const contrastStrength = Math.pow(normalizedStrength, 0.5);
     const color = new THREE.Color(
-      0.1 + contrastStrength * 0.9,  // lighter gray (0.1) to black (1.0)
+      0.1 + contrastStrength * 0.9, 
       0.1 + contrastStrength * 0.9,
       0.1 + contrastStrength * 0.9
     );
     const mat = new THREE.MeshBasicMaterial({ color });
-
     const shaftGeo = new THREE.CylinderGeometry(shaftRad, shaftRad, shaftLen, 8);
     const shaft = new THREE.Mesh(shaftGeo, mat);
     shaft.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), dir);
     shaft.position.copy(pos.clone().add(dir.clone().multiplyScalar(shaftLen/2)));
     scene.add(shaft);
     arrowHelpers.push(shaft);
-
     const headGeo = new THREE.ConeGeometry(headRad, headLen, 8);
     const head = new THREE.Mesh(headGeo, mat);
     head.quaternion.copy(shaft.quaternion);
@@ -236,10 +249,10 @@
           const d = E.normalize().multiplyScalar(stepSize);
           pos = pos.clone().add(d);
           points.push(pos.clone());
+
           if (charges.some(c => c.type === 'negative' && pos.distanceTo(c.position) < 0.3)) break;
         }
 
-        // draw line
         const geo = new THREE.BufferGeometry().setFromPoints(points);
         const mat = new THREE.LineBasicMaterial({ color: 0x333333 });
         const line = new THREE.Line(geo, mat);
@@ -254,70 +267,132 @@
     }
   }
 
-  function step() {
-    const force = computeFieldAt(puckMesh.position).multiplyScalar(puckCharge);
-    puckVelocity.add(force.multiplyScalar(timeStep));
-    puckVelocity.multiplyScalar(1 - decayRate * timeStep);
-    puckMesh.position.add(puckVelocity.clone().multiplyScalar(timeStep));
-    stepCount++;
-    dispatch('step', stepCount);
-    if (showTrace) {
-      tracePoints.push(puckMesh.position.clone());
-      updateTraceLine();
-    }
-  }
-
   function updateTraceLine() {
-    if (traceLine) scene.remove(traceLine);
-    tracePoints.push(puckMesh.position.clone());
-    const geom = new THREE.BufferGeometry().setFromPoints(tracePoints);
-    const mat  = new THREE.LineBasicMaterial({ color: 0x000000 });
-    traceLine = new THREE.Line(geom, mat);
+    if(!showTrace || tracePoints.length<2){
+      if (traceLine) {
+        scene.remove(traceLine);
+        traceLine.geometry.dispose();
+        traceLine = null;
+      }
+      return;
+    }
+    const positions = tracePoints.flatMap(p => [p.x, p.y, p.z]);
+    const geometry = new LineGeometry();
+    geometry.setPositions(positions);
+    
+    if(!traceMaterial){
+      traceMaterial = new LineMaterial({
+        color: 0x00ff00,
+        linewidth: 3,
+        dashed: false,
+        opacity: 1.0,
+        transparent: false
+      });
+    }
+    traceMaterial.depthTest = false;
+    traceMaterial.depthWrite = false;
+    traceMaterial.resolution.set(canvas.clientWidth, canvas.clientHeight);
+    
+    if(traceLine){
+      scene.remove(traceLine);
+      traceLine.geometry.dispose();
+    }
+    traceLine = new Line2(geometry, traceMaterial);
+    traceLine.renderOrder = 999;
     scene.add(traceLine);
   }
 
+  function step() {
+    const E = computeFieldAt(puckPosition);
+    const force = E.multiplyScalar(puckCharge);
+    const acceleration = force.divideScalar(mass);
+    puckVelocity.addScaledVector(acceleration,timeStep);
+    puckVelocity.multiplyScalar(Math.max(0,1-decayRate*timeStep));
+    puckPosition.addScaledVector(puckVelocity, timeStep);
+    puckMesh.position.copy(puckPosition);
+    stepCount++;
+    if (stepCount % 5 === 0) {
+      dispatch('step', stepCount);
+    }
+    if (showTrace) {
+      tracePoints.push(puckPosition.clone());
+      if (tracePoints.length > 5000) {
+        tracePoints.shift();
+      }
+      updateTraceLine();
+    }
+  }
   export function play() {
-    if (!isPlaying) {
-      isPlaying = true;
+    isPlaying = true;
+    if (!animationId) {
+      if (showTrace) {
+        const initialPoint = puckMesh.position.clone();
+        tracePoints = [initialPoint];
+        updateTraceLine();
+      }
       animate();
     }
   }
 
-  export function resetSim() {
+  export function pause() {
     isPlaying = false;
-    if (animationId) cancelAnimationFrame(animationId);
-    charges.forEach(c => {
-      if (!c.position.equals(bluePositions[0]) && !c.position.equals(redPositions[0])) {
-        scene.remove(c.mesh);
-      }
-    });
-    charges = charges.filter(c => 
-      c.position.equals(bluePositions[0]) || 
-      c.position.equals(redPositions[0])
-    );
+  }
+
+  export function reset() {
+    isPlaying = false;
+    if (animationId!= null) cancelAnimationFrame(animationId);
+    charges.forEach(c => scene.remove(c.mesh));
+    charges = [];
+    blueIndex = 0;
+    redIndex  = 0;
+    addBlueCharge();
+    addRedCharge();
 
     tracePoints = [];
-    if (traceLine){
+    if (traceLine) {
       scene.remove(traceLine);
-      traceLine=null;
+      traceLine = null;
     }
-    puckVelocity.set(0,0,0);
-    puckMesh.position.set(0,0.1,0);
+    puckVelocity.set(0, 0, 0);
+    puckPosition.set(0, Math.random() * 2 - 1, 0);
+    puckMesh.position.copy(puckPosition);
     stepCount = 0;
-    dispatch('step',stepCount);
-    blueIndex = 1;
-    redIndex = 1;
-    controls.update();
-    renderer.render(scene,camera);
-    updateStreamlines();
+    dispatch('step', stepCount);
     resetView();
+    updateStreamlines();
+    controls.update();
+    renderer.render(scene, camera);
+    animate();
+  }
+
+  export function setPuckCharge(charge: number) {
+    puckCharge = charge;
+  }
+
+  export function setDecayRate(rate: number) {
+    decayRate = rate;
+  }
+
+  export function setShowTrace(show: boolean) {
+    showTrace = show;
+    if (show) {
+      const initialPoint = puckMesh.position.clone();
+      tracePoints = [initialPoint];
+      updateTraceLine();
+    } else {
+      if (traceLine) {
+        scene.remove(traceLine);
+        traceLine = null;
+      }
+    }
   }
 
   export function addBlueCharge() {
     if (blueIndex >= bluePositions.length) return;
     const pos = bluePositions[blueIndex++];
     const mesh = new THREE.Mesh(
-      new THREE.SphereGeometry(0.2,16,16), new THREE.MeshBasicMaterial({ color: 0x0000ff })
+      new THREE.SphereGeometry(0.2,16,16), 
+      new THREE.MeshBasicMaterial({ color: 0x0000ff })
     );
     mesh.position.copy(pos);
     scene.add(mesh);
@@ -328,34 +403,19 @@
   export function addRedCharge() {
     if (redIndex >= redPositions.length) return;
     const pos = redPositions[redIndex++];
-    const mat =new THREE.MeshBasicMaterial({
-      color:0xff0000,
-      transparent:true
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0xff0000,
+      transparent: true
     });
-
-    const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.2,16,16),mat);
+    const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.2,16,16), mat);
     mesh.position.copy(pos);
     scene.add(mesh);
     charges.push({ position: pos.clone(), type: 'negative', mesh });
     updateStreamlines();
   }
-  export function zoomIn(){
-    if(camera instanceof THREE.PerspectiveCamera){
-      camera.fov /=1.2;
-      camera.updateProjectionMatrix();
-      controls.update();
-      renderer.render(scene,camera);
-    }
-  }
-  export function zoomOut(){
-    if(camera instanceof THREE.PerspectiveCamera){
-      camera.fov *=1.2;
-      camera.updateProjectionMatrix();
-      controls.update();
-      renderer.render(scene,camera);
-    }
-  }
-  export function resetView(){
+
+
+  function resetView(){
     camera.fov=60;
     camera.position.set(10,10,10);
     camera.updateProjectionMatrix();
@@ -365,11 +425,7 @@
 
   onMount(() => {
     init();
-    animationId=requestAnimationFrame(function renderLoop(){
-      controls.update();
-      renderer.render(scene,camera);
-      animationId=requestAnimationFrame(renderLoop)
-    });
+    animate();
     window.addEventListener('resize', () => {
       renderer.setSize(canvas.clientWidth, canvas.clientHeight);
       camera.aspect = canvas.clientWidth / canvas.clientHeight;
