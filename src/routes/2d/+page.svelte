@@ -1,6 +1,12 @@
 <script lang="ts">
 	import { rk4, leapfrog } from '$lib/mathutils';
 	import { arrow } from './SVGSnippets.svelte';
+	import Goal from './Goal.svelte';
+
+	interface Position {
+		x: number;
+		y: number;
+	}
 
 	interface Particle {
 		x: number;
@@ -26,7 +32,22 @@
 		},
 	]);
 
+	//$inspect(particles);
+
 	let decay = $state(2);
+
+	// Goal-related constants and state
+	const g_scale = 0.3;
+	const GOAL_LENGTH = 120.32; // Height of the goal in svg
+	const GOAL_WIDTH = 87.552; // Width of the goal in svg
+
+	let g_width = g_scale * GOAL_WIDTH;
+	let g_length = g_scale * GOAL_LENGTH;
+
+	let gameOver = $state(false);
+	let winner = $state<'left' | 'right' | null>(null);
+
+	let wallsEnabled = $state(false);
 
 	const RADIUS = 2;
 
@@ -35,7 +56,7 @@
 		for (const p of particles) {
 			const r = Math.hypot(u - p.x, v - p.y);
 			if (r < RADIUS) {
-				console.log('close call', p.x, p.y);
+				//console.log('close call', p.x, p.y);
 				vec[0] +=
 					(Math.pow(r / RADIUS, 2) * (10 * (p.charge * (u - p.x)))) / Math.pow(r, decay + 1);
 				vec[1] +=
@@ -46,6 +67,139 @@
 			}
 		}
 		return vec;
+	}
+
+	function intersect(p1: Position, p2: Position, p3: Position, p4: Position): Position | null {
+		const det = (p1.x - p2.x) * (p3.y - p4.y) - (p1.y - p2.y) * (p3.x - p4.x);
+
+		// Lines are parallel, no intersection
+		if (det === 0) return null;
+
+		const t1 = ((p1.x - p3.x) * (p3.y - p4.y) - (p1.y - p3.y) * (p3.x - p4.x)) / det;
+		const t2 = ((p1.x - p3.x) * (p1.y - p2.y) - (p1.y - p3.y) * (p1.x - p2.x)) / det;
+
+		// Check if intersection point is within both segments
+		if (t1 >= 0 && t1 <= 1 && t2 >= 0 && t2 <= 1) {
+			// Calculate the intersection point
+			const ix = p1.x + t1 * (p2.x - p1.x);
+			const iy = p1.y + t1 * (p2.y - p1.y);
+
+			// Reflect p2 across the line through p3 and p4
+			const dx = p4.x - p3.x;
+			const dy = p4.y - p3.y;
+
+			const lengthSquared = dx * dx + dy * dy;
+
+			// Vector from p3 to p2
+			const vx = p2.x - p3.x;
+			const vy = p2.y - p3.y;
+
+			// Dot product of (p2 - p3) and (p3 - p4) normalized by the line length squared
+			const dot = (vx * dx + vy * dy) / lengthSquared;
+
+			// Reflection formula: p2' = p2 - 2 * dot * (p3 - p4)
+			const rx = p2.x - 2 * dot * dx;
+			const ry = p2.y - 2 * dot * dy;
+
+			return { x: rx, y: ry };
+		}
+
+		return null; // No intersection
+	}
+
+	// bar boundary collision detection
+
+	function checkCollision(): [number, number, number, number] | null {
+		let coll =
+			(wallsEnabled &&
+				(intersect(
+					lastPuck,
+					puck,
+					{ x: -WIDTH / 2, y: HEIGHT / 2 },
+					{ x: -WIDTH / 2, y: -HEIGHT / 2 },
+				) ||
+					intersect(
+						lastPuck,
+						puck,
+						{ x: WIDTH / 2, y: HEIGHT / 2 },
+						{ x: WIDTH / 2, y: -HEIGHT / 2 },
+					))) ||
+			// back of the goals
+			intersect(
+				lastPuck,
+				puck,
+				{ x: 300 / 2, y: g_length / 2 },
+				{ x: 300 / 2, y: -g_length / 2 },
+			) ||
+			intersect(
+				lastPuck,
+				puck,
+				{ x: -300 / 2, y: g_length / 2 },
+				{ x: -300 / 2, y: -g_length / 2 },
+			) ||
+			intersect(
+				lastPuck,
+				puck,
+				{ x: -300 / 2 + g_width, y: g_length / 2 },
+				{ x: -300 / 2 + g_width, y: g_length * 0.4 },
+			) ||
+			intersect(
+				lastPuck,
+				puck,
+				{ x: -300 / 2 + g_width, y: -g_length / 2 },
+				{ x: -300 / 2 + g_width, y: -g_length * 0.4 },
+			);
+
+		if (coll) {
+			console.log(coll);
+			return [coll.x, coll.y, -1, 1];
+		}
+
+		coll =
+			(wallsEnabled &&
+				(intersect(
+					lastPuck,
+					puck,
+					{ x: -WIDTH / 2, y: HEIGHT / 2 },
+					{ x: WIDTH / 2, y: HEIGHT / 2 },
+				) ||
+					intersect(
+						lastPuck,
+						puck,
+						{ x: -WIDTH / 2, y: -HEIGHT / 2 },
+						{ x: WIDTH / 2, y: -HEIGHT / 2 },
+					))) ||
+			// sides of the goals
+			intersect(
+				lastPuck,
+				puck,
+				{ x: 300 / 2, y: g_length / 2 },
+				{ x: 300 / 2 - g_width, y: g_length / 2 },
+			) ||
+			intersect(
+				lastPuck,
+				puck,
+				{ x: -300 / 2, y: g_length / 2 },
+				{ x: -300 / 2 + g_width, y: g_length / 2 },
+			) ||
+			intersect(
+				lastPuck,
+				puck,
+				{ x: 300 / 2, y: -g_length / 2 },
+				{ x: 300 / 2 - g_width, y: -g_length / 2 },
+			) ||
+			intersect(
+				lastPuck,
+				puck,
+				{ x: -300 / 2, y: -g_length / 2 },
+				{ x: -300 / 2 + g_width, y: -g_length / 2 },
+			);
+		if (coll) {
+			console.log('vert doink', coll);
+			return [coll.x, coll.y, 1, -1];
+		}
+
+		return null;
 	}
 
 	let svg: SVGElement;
@@ -86,8 +240,12 @@
 		vx: 0,
 		vy: 0,
 	});
+	const lastPuck: Position = {
+		x: PUCKX,
+		y: PUCKY,
+	};
 
-	// $inspect(puck);
+	//$inspect(puck);
 
 	let puckTrace: [number, number][] = $state([[PUCKX, PUCKY]]);
 	let traceString = $derived(
@@ -95,7 +253,7 @@
 			puckTrace.map(([x, y]) => `L${x},${y} `).reduce((p = '', c = '') => p + c),
 	);
 
-	// $inspect(puck);
+	//$inspect(puck);
 
 	// Field dimensions
 	let WIDTH = $state(300);
@@ -121,15 +279,42 @@
 	let req: number | undefined;
 	let clock = $state(0);
 
+	function checkGoal() {
+		if (
+			intersect(
+				lastPuck,
+				puck,
+				{ x: -300 / 2 + g_width * 0.9, y: -g_length * 0.4 },
+				{ x: -300 / 2 + g_width * 0.9, y: g_length * 0.4 },
+			)
+		) {
+			gameOver = true;
+			winner = 'left';
+			return true;
+		} else if (
+			intersect(
+				lastPuck,
+				puck,
+				{ x: 300 / 2 - g_width * 0.9, y: -g_length * 0.4 },
+				{ x: 300 / 2 - g_width * 0.9, y: g_length * 0.4 },
+			)
+		) {
+			gameOver = true;
+			winner = 'right';
+			return true;
+		}
+
+		return false;
+	}
+
 	function updatePuck(dt: number) {
 		// make this adaptive?
 		let runningTime = 0;
 		let v = [puck.x, puck.y, puck.vx, puck.vy];
 		let ticks = 0;
 		while (runningTime < dt) {
-			// const d = Math.hypot(...vf(v[0], v[1]));
 			let h = Math.max(1e-8, dt / Math.max(10, Math.hypot(v[2], v[3])));
-			h - Math.min(h, dt - runningTime);
+			h = Math.min(h, dt - runningTime);
 			runningTime += h;
 
 			for (let index = 0; index < 10; index++) {
@@ -139,15 +324,37 @@
 					[v[0], v[1]],
 					h,
 				);
+
+				puck.x = v[0];
+				puck.y = v[1];
+
+				// Check for goal before updating
+				if (checkGoal()) {
+					go = false;
+					if (req) cancelAnimationFrame(req);
+					return;
+				}
+
+				// Check for  boundary collision
+				const collision = checkCollision();
+				if (collision) {
+					// Apply bounce with some energy loss
+					const bounceFactor = 1;
+					puck.x = collision[0];
+					puck.y = collision[1];
+					v[2] *= collision[2] * bounceFactor;
+					v[3] *= collision[3] * bounceFactor;
+				}
 			}
 			ticks += 1;
 		}
-		puck.x = v[0];
-		puck.y = v[1];
+
 		puck.vx = v[2];
 		puck.vy = v[3];
 		puckTrace.push([v[0], v[1]]);
-		if (ticks > 11) console.log('tickss: ', ticks);
+		if (ticks > 11) console.log('ticks: ', ticks);
+		lastPuck.x = puck.x;
+		lastPuck.y = puck.y;
 	}
 
 	function animate(t = 0) {
@@ -196,6 +403,51 @@
 			/>
 		{/if}
 
+		<!-- Left Goal -->
+		<Goal x={-300 / 2} y={g_length / 2} scale={g_scale} rot={-90} />
+
+		<!-- Right Goal -->
+		<Goal x={300 / 2} y={-g_length / 2} scale={g_scale} rot={90} />
+
+		{#if wallsEnabled}
+			<!-- Top Wall -->
+			<line
+				x1={-WIDTH / 2}
+				y1={-HEIGHT / 2}
+				x2={WIDTH / 2}
+				y2={-HEIGHT / 2}
+				stroke="black"
+				stroke-width="4"
+			/>
+			<!-- Bottom Wall -->
+			<line
+				x1={-WIDTH / 2}
+				y1={HEIGHT / 2}
+				x2={WIDTH / 2}
+				y2={HEIGHT / 2}
+				stroke="black"
+				stroke-width="4"
+			/>
+			<!-- Left Wall -->
+			<line
+				x1={-WIDTH / 2}
+				y1={-HEIGHT / 2}
+				x2={-WIDTH / 2}
+				y2={HEIGHT / 2}
+				stroke="black"
+				stroke-width="4"
+			/>
+			<!-- Right Wall -->
+			<line
+				x1={WIDTH / 2}
+				y1={-HEIGHT / 2}
+				x2={WIDTH / 2}
+				y2={HEIGHT / 2}
+				stroke="black"
+				stroke-width="4"
+			/>
+		{/if}
+
 		{#each particles as particle}
 			<circle
 				cx={particle.x}
@@ -229,7 +481,9 @@
 				clock = 0;
 				last = undefined;
 				go = false;
-				puck = { x: PUCKY, y: -PUCKY, vx: 0, vy: 0, charge: 10 };
+				gameOver = false;
+				winner = null;
+				puck = { x: PUCKX, y: PUCKY, vx: 0, vy: 0, charge: 10 };
 				puckTrace = [[PUCKX, PUCKY]];
 			}}
 		>
@@ -324,6 +578,22 @@
 				class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
 			/>
 		</label>
+		<label for="walls" class="flex items-center gap-2">
+			<span class="font-medium">Enable Walls</span>
+			<input
+				type="checkbox"
+				name="walls"
+				bind:checked={wallsEnabled}
+				class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+			/>
+		</label>
+	</div>
+	<div>
+		{#if gameOver}
+			<div class="mb-4 w-full text-center text-2xl font-bold text-green-600">
+				{winner === 'left' ? 'Left' : 'Right'} side wins!
+			</div>
+		{/if}
 	</div>
 </div>
 
@@ -331,6 +601,7 @@
 	@reference "tailwindcss/theme";
 
 	svg {
+		margin: 10px;
 		border: 1px solid black;
 		width: 100vw;
 		max-width: 800px;
