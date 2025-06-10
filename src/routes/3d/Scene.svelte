@@ -10,16 +10,12 @@
     interactivity()
 
 
-    // onclick={() => {
-    //         particles = particles.filter(part => part.id !== p.id)
-    //         addMode = true
-    //         newParticleCoords = [p.x, p.y, p.z]
-    //     }}
+
 
 
     // CODE FOR SETUP FROM +page.svelte
 
-    let {instructions, addModeFunc, chargeFunc, resetNewParticleCoords, modifyNewParticleCoords} = $props()
+    let {instructions, addModeFunc, resetFunc, resetNewParticleCoords, modifyNewParticleCoords} = $props()
 
     let resetVal = $derived(instructions.reset)
 
@@ -61,11 +57,15 @@
         charge: 1
     })
 
+    
+
 
   
     let particles = $state([
         { id: 1, x: 0, y: 2, z: 0, charge: -0.001 }
     ])  
+
+    $inspect(particles)
 
 
     let puckPosition: [number, number, number] = $derived([puck.x, puck.y, puck.z]);
@@ -159,8 +159,6 @@
         if (go) {
   
             req = requestAnimationFrame(animate)
-            
-
 
         } else if (req) {
             cancelAnimationFrame(req)
@@ -174,6 +172,10 @@
             if (req) cancelAnimationFrame(req);
             clock = 0;
             last = undefined;
+
+            // no longer in edit mode
+            stopEditing()
+
       
             // cannot reassign to puck var, must mutate fields
             puck.x = 0;
@@ -188,10 +190,11 @@
             points.length = 0;
    
             particles = [{ id: 1, x: 0, y: 2, z: 0, charge: -0.001 }]
-      
 
-            //resetVal = false;
-           
+            
+
+            // to mutate the isReset in +page.svelte to be false so that this code block only runs once
+            resetFunc()
       
         }
     })
@@ -205,16 +208,13 @@
     let particle_num = $derived(particles.length > 0 ? particles[particles.length - 1].id + 1: 1)
 
     function addParticle([x, y, z]: [number, number, number]) {
-        particles.push({
+        particles = [...particles, {
             id: particle_num, 
             x,
             y,
             z,
             charge: charge
-        });
-
-        // reset addCharge in +page.svelte to 0
-        chargeFunc()
+        }]
     }
 
 
@@ -244,8 +244,63 @@
     // CODE FOR EDITING PARTICLES
 
     let editMode = $state(false)
+    let editChargeRef : Mesh | undefined = $state(undefined)
+    let editingParticleId: number | null = $state(null)
 
+    function startEditing(id: number) {
+        editingParticleId = id
+        editMode = true
+    }
+
+    function stopEditing() {
+        editingParticleId = null
+        editMode = false
+    }
+
+
+    function confirmEdit() {
+        if (editChargeRef) {
+            const world = new Vector3();
+            editChargeRef.getWorldPosition(world);
+
+            // Update the existing particle's position
+            particles = particles.map(p =>
+            p.id === editingParticleId
+                ? { ...p, x: world.x, y: world.y, z: world.z }
+                : p
+            );
+        }
+
+        newParticleCoords = [0, 0, 0];
+    }
+
+
+
+    let clickTimeout: ReturnType<typeof setTimeout>;
+
+    function handleSingleClick(particleId: number) {
+        clearTimeout(clickTimeout);
+        clickTimeout = setTimeout(() => {
+            if (!editMode) {
+            startEditing(particleId);
+            }
+        }, 250);
+    }
+
+    function handleDoubleClickConfirmEdit() {
+        clearTimeout(clickTimeout);
+        confirmEdit();
+        stopEditing();
+    }
+
+    function handleDoubleClickDelete(particleId: number) {
+        clearTimeout(clickTimeout);
+        particles = particles.filter(part => part.id !== particleId);
+    }
     
+
+
+
 
 
     // vector field for particles (defined in 10 x 10 x 10 grid)
@@ -263,6 +318,8 @@
             }
         }
     }
+
+
 
 
     let vectorField: {
@@ -328,21 +385,28 @@
 
 <!-- Render particles -->
 {#each particles as p (p.id)}
-    <T.Mesh
+    <T.Group 
         position={[p.x, p.y, p.z]}
-        ondblclick={() => {
-            particles = particles.filter(part => part.id !== p.id)
-        }}
-        
-       
-       
-       >
+        onclick={() => handleSingleClick(p.id)}
 
-        
+        >
 
-        <T.SphereGeometry args={[0.25, 32, 32]} />
-        <T.MeshStandardMaterial color={p.charge > 0 ? 'red' : 'blue'} />
-    </T.Mesh>
+        {#if editMode && editingParticleId === p.id}
+            <TransformControls
+        >
+                <T.Mesh bind:ref={editChargeRef} ondblclick={handleDoubleClickConfirmEdit}>
+                    <T.SphereGeometry args={[0.25, 32, 32]} />
+                    <T.MeshStandardMaterial color={p.charge > 0 ? 'red' : 'blue'} />
+                </T.Mesh>
+            </TransformControls>
+        {:else}
+            <T.Mesh
+            ondblclick ={() => handleDoubleClickDelete(p.id)}>
+                <T.SphereGeometry args={[0.25, 32, 32]} />
+                <T.MeshStandardMaterial color={p.charge > 0 ? 'red' : 'blue'} />
+            </T.Mesh>
+        {/if}
+    </T.Group>
 {/each}
 
 
@@ -355,28 +419,28 @@
 
 <!--moving charges in 3d space (add mode)-->
 {#if addMode}
+
+    
     
     <!-- charge to be added -->
-<TransformControls 
-    position = {newParticleCoords}
-
-    onchange={() => {
-
-        if (chargeRef) {
-            const world = new Vector3()
-            chargeRef.getWorldPosition(world)
-            modifyNewParticleCoords([world.x, world.y, world.z])
-        }
-    }}
+    <TransformControls 
+        position = {newParticleCoords}
+        onchange={() => {
+            if (chargeRef) {
+                const world = new Vector3()
+                chargeRef.getWorldPosition(world)
+                modifyNewParticleCoords([world.x, world.y, world.z])
+            }
+        }}
     >
-    <T.Mesh
-        bind:ref={chargeRef}
-        ondblclick={confirmAdd}
-    >
-      <T.SphereGeometry args={[0.3, 32, 32]} />
-      <T.MeshStandardMaterial />
-    </T.Mesh>
-  </TransformControls>
+        <T.Mesh
+            bind:ref={chargeRef}
+            ondblclick={confirmAdd}
+        >
+            <T.SphereGeometry args={[0.3, 32, 32]} />
+            <T.MeshStandardMaterial color={charge > 0 ? 'red' : 'blue'} />
+        </T.Mesh>
+    </TransformControls>
 {/if}
 
 <!-- showing trace of puck -->

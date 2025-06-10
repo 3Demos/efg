@@ -35,9 +35,9 @@
         resetNewParticleCoords()
     }
 
-
-
-
+    function resetFunc() {
+        isReset = false
+    }
 
 
 
@@ -146,9 +146,8 @@
 <Canvas>
   <Scene 
   instructions={instructions} 
-
   addModeFunc={() => {addMode = false; confirmAddChoice = false}} 
-  chargeFunc={() => addCharge = 0}
+  resetFunc={resetFunc}
   resetNewParticleCoords={resetNewParticleCoords} 
   modifyNewParticleCoords = {modifyNewParticleCoords} 
   />
