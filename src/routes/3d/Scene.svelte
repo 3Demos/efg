@@ -318,35 +318,29 @@
 
 
     let lastEditPosition = new Vector3(); // initial dummy value
-    const updateThreshold = 1;
 
 
-    function updateEditingParticlePosition() {
-        if (editChargeRef && editingParticleId) {
-            const current = new Vector3();
-            editChargeRef.getWorldPosition(current);
 
-            if (current.distanceTo(lastEditPosition) > updateThreshold) {
-            // Update lastEditPosition
-            lastEditPosition.copy(current);
 
-            // Update the particle in the array
-            particles = particles.map(p =>
-                p.id === editingParticleId
-                ? { ...p, x: current.x, y: current.y, z: current.z }
-                : p
-            );
+
+    let editingLivePosition = new Vector3();
+
+
+    let editPositionTick = $state(0);
+
+  
+    function updateLiveEditPosition() {
+        if (editChargeRef) {
+            editChargeRef.getWorldPosition(editingLivePosition);
+
+            // Only trigger vectorField update if moved enough
+            if (editingLivePosition.distanceTo(lastEditPositionForField) > vectorFieldUpdateThreshold) {
+            lastEditPositionForField.copy(editingLivePosition);
+            editPositionTick += 1; // triggers reactive update
             }
         }
     }
 
-    let editingLivePosition = new Vector3();
-
-    function updateLiveEditPosition() {
-    if (editChargeRef) {
-        editChargeRef.getWorldPosition(editingLivePosition);
-    }
-    }
 
 
 
@@ -377,50 +371,59 @@
     }
 
 
+    
+
+    // update the vector field after edited particle has moved by some amount
 
 
-    let vectorField: {
-        shaftPos: [number, number, number],
-        headPos: [number, number, number],
-        quaternion: [number, number, number, number],
-        length: number,
-        opacity: number
-    }[] = $derived.by(() =>
-        fieldPoints.map(([x, y, z]) => {
-            const [fx, fy, fz] = vf(x, y, z);
-            const fieldMag = Math.hypot(fx, fy, fz);
-            const scale = 1.5 / (fieldMag || 1);
-            const dir = new Vector3(fx, fy, fz).multiplyScalar(scale);
-            const dirNorm = dir.clone().normalize();
+    let lastEditPositionForField = new Vector3();
+    const vectorFieldUpdateThreshold = 0.5;
 
-            const originVec = new Vector3(x, y, z);
-            const shaftPos = originVec.clone().add(dirNorm.clone().multiplyScalar(dir.length() * 0.4));
-            const headPos = originVec.clone().add(dirNorm.clone().multiplyScalar(dir.length()));
 
-            const defaultDir = new Vector3(0, 1, 0); // default cylinder up
-            const quaternion = new Quaternion().setFromUnitVectors(defaultDir, dirNorm).toArray() as [number,number,number,number];
 
-            // distance-based opacity
-            let minDist = Infinity;
-            for (const p of particles) {
-                const dx = x - p.x;
-                const dy = y - p.y;
-                const dz = z - p.z;
-                const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-                if (dist < minDist) minDist = dist;
-            }
+    let vectorField = $derived.by(() => {
+  editPositionTick; // <-- This makes the vectorField recompute when it changes
 
-            const opacity = Math.min(1, 5 / (minDist ** 2 + 0.1));
+  return fieldPoints.map(([x, y, z]) => {
+    const [fx, fy, fz] = vf(x, y, z);
+    const fieldMag = Math.hypot(fx, fy, fz);
+    const scale = 1.5 / (fieldMag || 1);
+    const dir = new Vector3(fx, fy, fz).multiplyScalar(scale);
+    const dirNorm = dir.clone().normalize();
 
-            return {
-                shaftPos: shaftPos.toArray() as [number, number, number],
-                headPos: headPos.toArray() as [number, number, number],
-                quaternion,
-                length: dir.length(),
-                opacity
-            };
-        })
-    );
+    const originVec = new Vector3(x, y, z);
+    const shaftPos = originVec.clone().add(dirNorm.clone().multiplyScalar(dir.length() * 0.4));
+    const headPos = originVec.clone().add(dirNorm.clone().multiplyScalar(dir.length()));
+
+    const defaultDir = new Vector3(0, 1, 0);
+    const quaternion = new Quaternion().setFromUnitVectors(defaultDir, dirNorm).toArray() as [number, number, number, number];
+
+    // Distance-based opacity
+    let minDist = Infinity;
+    for (const p of particles) {
+      const px = (editMode && p.id === editingParticleId) ? editingLivePosition.x : p.x;
+      const py = (editMode && p.id === editingParticleId) ? editingLivePosition.y : p.y;
+      const pz = (editMode && p.id === editingParticleId) ? editingLivePosition.z : p.z;
+
+      const dx = x - px;
+      const dy = y - py;
+      const dz = z - pz;
+      const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      if (dist < minDist) minDist = dist;
+    }
+
+    const opacity = Math.min(1, 5 / (minDist ** 2 + 0.1));
+
+    return {
+      shaftPos: shaftPos.toArray() as [number, number, number],
+      headPos: headPos.toArray() as [number, number, number],
+      quaternion,
+      length: dir.length(),
+      opacity
+    };
+  });
+});
+
 
 
 
