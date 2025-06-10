@@ -77,22 +77,37 @@
     const RADIUS = 2
 
     function vf(x: number, y: number, z: number): [number, number, number] {
-        const vec = [0, 0, 0]
-        for (const p of particles) {
-            const dx = x - p.x
-            const dy = y - p.y
-            const dz = z - p.z
-            const r = Math.hypot(dx, dy, dz)
-            const factor = r < RADIUS
-                ? Math.pow(r / RADIUS, 2) / Math.pow(r, decay + 1)
-                : 1 / Math.pow(r, decay + 1)
+  const vec = [0, 0, 0];
 
-            vec[0] += 10 * p.charge * dx * factor
-            vec[1] += 10 * p.charge * dy * factor
-            vec[2] += 10 * p.charge * dz * factor
-        }
-        return vec as [number, number, number]
-    }
+  for (const p of particles) {
+    // Use ghost position if particle is being edited
+    const px = (editMode && p.id === editingParticleId)
+      ? editingLivePosition.x
+      : p.x;
+    const py = (editMode && p.id === editingParticleId)
+      ? editingLivePosition.y
+      : p.y;
+    const pz = (editMode && p.id === editingParticleId)
+      ? editingLivePosition.z
+      : p.z;
+
+    const dx = x - px;
+    const dy = y - py;
+    const dz = z - pz;
+    const r = Math.hypot(dx, dy, dz);
+
+    const factor = r < RADIUS
+      ? Math.pow(r / RADIUS, 2) / Math.pow(r, decay + 1)
+      : 1 / Math.pow(r, decay + 1);
+
+    vec[0] += 10 * p.charge * dx * factor;
+    vec[1] += 10 * p.charge * dy * factor;
+    vec[2] += 10 * p.charge * dz * factor;
+  }
+
+  return vec as [number, number, number];
+}
+
 
     const PUCKX = 0;
 	const PUCKY = 0;
@@ -247,10 +262,17 @@
     let editChargeRef : Mesh | undefined = $state(undefined)
     let editingParticleId: number | null = $state(null)
 
-    function startEditing(id: number) {
-        editingParticleId = id
-        editMode = true
+    function startEditing(particleId: number) {
+        editingParticleId = particleId;
+        editMode = true;
+
+        // Get the initial position from that particle
+        const p = particles.find(p => p.id === particleId);
+        if (p) {
+            lastEditPosition.set(p.x, p.y, p.z);
+        }
     }
+
 
     function stopEditing() {
         editingParticleId = null
@@ -259,14 +281,10 @@
 
 
     function confirmEdit() {
-        if (editChargeRef) {
-            const world = new Vector3();
-            editChargeRef.getWorldPosition(world);
-
-            // Update the existing particle's position
+        if (editingParticleId) {
             particles = particles.map(p =>
             p.id === editingParticleId
-                ? { ...p, x: world.x, y: world.y, z: world.z }
+                ? { ...p, x: editingLivePosition.x, y: editingLivePosition.y, z: editingLivePosition.z }
                 : p
             );
         }
@@ -297,7 +315,46 @@
         clearTimeout(clickTimeout);
         particles = particles.filter(part => part.id !== particleId);
     }
-    
+
+
+    let lastEditPosition = new Vector3(); // initial dummy value
+    const updateThreshold = 1;
+
+
+    function updateEditingParticlePosition() {
+        if (editChargeRef && editingParticleId) {
+            const current = new Vector3();
+            editChargeRef.getWorldPosition(current);
+
+            if (current.distanceTo(lastEditPosition) > updateThreshold) {
+            // Update lastEditPosition
+            lastEditPosition.copy(current);
+
+            // Update the particle in the array
+            particles = particles.map(p =>
+                p.id === editingParticleId
+                ? { ...p, x: current.x, y: current.y, z: current.z }
+                : p
+            );
+            }
+        }
+    }
+
+    let editingLivePosition = new Vector3();
+
+    function updateLiveEditPosition() {
+    if (editChargeRef) {
+        editChargeRef.getWorldPosition(editingLivePosition);
+    }
+    }
+
+
+
+
+
+
+
+
 
 
 
@@ -393,6 +450,7 @@
 
         {#if editMode && editingParticleId === p.id}
             <TransformControls
+            onchange={() => updateLiveEditPosition()}
         >
                 <T.Mesh bind:ref={editChargeRef} ondblclick={handleDoubleClickConfirmEdit}>
                     <T.SphereGeometry args={[0.25, 32, 32]} />
