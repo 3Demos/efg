@@ -69,24 +69,41 @@
 		return vec;
 	}
 
-	function intersect(p1: Position, p2: Position, p3: Position, p4: Position): Position | null {
-		const det = (p1.x - p2.x) * (p3.y - p4.y) - (p1.y - p2.y) * (p3.x - p4.x);
+	/**
+	 * 
+	 * Check intersection of line from p1 to p2 crossing left-to-right relative to segment oriented from p3 to p4
+	 */
+	function intersect(p1: Position, p2: Position, p3: Position, p4: Position, goal = false): Position | null {
+		const a = p2.x - p1.x;
+		const b = p4.x - p3.x;
+		const c = p2.y - p1.y;
+		const d = p4.y - p3.y;
+		const det = a*d - b*c;
 
-		// Lines are parallel, no intersection
-		if (det === 0) return null;
 
-		const t1 = ((p1.x - p3.x) * (p3.y - p4.y) - (p1.y - p3.y) * (p3.x - p4.x)) / det;
-		const t2 = ((p1.x - p3.x) * (p1.y - p2.y) - (p1.y - p3.y) * (p1.x - p2.x)) / det;
+		// Lines are parallel or cross in wrong direction, no intersection
+		if (det <= 0) return null;
+
+		const t = (d * (p4.x - p1.x) - b*(p4.y - p1.y)) / det
+		const s = (-c * (p4.x - p1.x) + a*(p4.y - p1.y)) / det
+
+		// const t1 = ((p1.x - p3.x) * (p3.y - p4.y) - (p1.y - p3.y) * (p3.x - p4.x)) / det;
+		// const t2 = ((p1.x - p3.x) * (p1.y - p2.y) - (p1.y - p3.y) * (p1.x - p2.x)) / det;
 
 		// Check if intersection point is within both segments
-		if (t1 >= 0 && t1 <= 1 && t2 >= 0 && t2 <= 1) {
+		if (t >= 0 && t <= 1 && s >= 0 && s <= 1) {
 			// Calculate the intersection point
-			const ix = p1.x + t1 * (p2.x - p1.x);
-			const iy = p1.y + t1 * (p2.y - p1.y);
+			const ix = p1.x + t * (p2.x - p1.x);
+			const iy = p1.y + t * (p2.y - p1.y);
+
+			if (goal) 
+				return {x: ix, y: iy}
 
 			// Reflect p2 across the line through p3 and p4
-			const dx = p4.x - p3.x;
-			const dy = p4.y - p3.y;
+
+			// First rotate 90 deg
+			const dx = p4.y - p3.y;
+			const dy = p3.x - p4.x;
 
 			const lengthSquared = dx * dx + dy * dy;
 
@@ -97,7 +114,7 @@
 			// Dot product of (p2 - p3) and (p3 - p4) normalized by the line length squared
 			const dot = (vx * dx + vy * dy) / lengthSquared;
 
-			// Reflection formula: p2' = p2 - 2 * dot * (p3 - p4)
+			// Reflection formula: p2' = p2 - 2 * dot * (dx,dy)
 			const rx = p2.x - 2 * dot * dx;
 			const ry = p2.y - 2 * dot * dy;
 
@@ -121,8 +138,8 @@
 					intersect(
 						lastPuck,
 						puck,
-						{ x: WIDTH / 2, y: HEIGHT / 2 },
 						{ x: WIDTH / 2, y: -HEIGHT / 2 },
+						{ x: WIDTH / 2, y: HEIGHT / 2 },
 					))) ||
 			// back of the goals
 			intersect(
@@ -134,9 +151,10 @@
 			intersect(
 				lastPuck,
 				puck,
-				{ x: -300 / 2, y: g_length / 2 },
 				{ x: -300 / 2, y: -g_length / 2 },
-			) ||
+				{ x: -300 / 2, y: g_length / 2 },
+			) || 
+			// posts
 			intersect(
 				lastPuck,
 				puck,
@@ -146,9 +164,35 @@
 			intersect(
 				lastPuck,
 				puck,
-				{ x: -300 / 2 + g_width, y: -g_length / 2 },
 				{ x: -300 / 2 + g_width, y: -g_length * 0.4 },
-			);
+				{ x: -300 / 2 + g_width, y: -g_length / 2 },
+			) ||
+			intersect(
+				lastPuck,
+				puck,
+				{ x: 300 / 2 - g_width, y: g_length * 0.4 },
+				{ x: 300 / 2 - g_width, y: g_length / 2 },
+			) ||
+			intersect(
+				lastPuck,
+				puck,
+				{ x: 300 / 2 - g_width, y: -g_length / 2 },
+				{ x: 300 / 2 - g_width, y: -g_length * 0.4 },
+			) || 
+			// back walls
+			intersect(
+				lastPuck,
+				puck,
+				{ x: 300 / 2 - 0.1*g_length, y: -g_length * 0.4 },
+				{ x: 300 / 2 - 0.1*g_length, y: g_length * 0.4 },
+			) ||
+			intersect(
+				lastPuck,
+				puck,
+				{ x: -300 / 2 + 0.1*g_length, y: g_length * 0.4 },
+				{ x: -300 / 2 + 0.1*g_length, y: -g_length * 0.4 },
+			) 
+			;
 
 		if (coll) {
 			console.log(coll);
@@ -160,8 +204,8 @@
 				(intersect(
 					lastPuck,
 					puck,
-					{ x: -WIDTH / 2, y: HEIGHT / 2 },
 					{ x: WIDTH / 2, y: HEIGHT / 2 },
+					{ x: -WIDTH / 2, y: HEIGHT / 2 },
 				) ||
 					intersect(
 						lastPuck,
@@ -173,8 +217,8 @@
 			intersect(
 				lastPuck,
 				puck,
-				{ x: 300 / 2, y: g_length / 2 },
 				{ x: 300 / 2 - g_width, y: g_length / 2 },
+				{ x: 300 / 2, y: g_length / 2 },
 			) ||
 			intersect(
 				lastPuck,
@@ -191,8 +235,32 @@
 			intersect(
 				lastPuck,
 				puck,
-				{ x: -300 / 2, y: -g_length / 2 },
 				{ x: -300 / 2 + g_width, y: -g_length / 2 },
+				{ x: -300 / 2, y: -g_length / 2 },
+			) ||
+			intersect(
+				lastPuck,
+				puck,
+				{ x: 300 / 2 - g_length * 0.1, y: 0.4 * g_length },
+				{ x: 300 / 2 - g_width, y: 0.4 * g_length },
+			) ||
+			intersect(
+				lastPuck,
+				puck,
+				{ x: 300 / 2 - g_width, y: -0.4 * g_length },
+				{ x: 300 / 2 - g_length * 0.1, y: -0.4 * g_length },
+			) ||
+			intersect(
+				lastPuck,
+				puck,
+				{ x: -300 / 2 + g_width, y: 0.4 * g_length },
+				{ x: -300 / 2 + g_length * 0.1, y: 0.4 * g_length },
+			)||
+			intersect(
+				lastPuck,
+				puck,
+				{ x: -300 / 2 + g_length * 0.1, y: -0.4 * g_length },
+				{ x: -300 / 2 + g_width, y: -0.4 * g_length },
 			);
 		if (coll) {
 			console.log('vert doink', coll);
@@ -279,13 +347,13 @@
 	let req: number | undefined;
 	let clock = $state(0);
 
-	function checkGoal() {
+	function checkGoal(): boolean {
 		if (
 			intersect(
 				lastPuck,
 				puck,
-				{ x: -300 / 2 + g_width * 0.9, y: -g_length * 0.4 },
 				{ x: -300 / 2 + g_width * 0.9, y: g_length * 0.4 },
+				{ x: -300 / 2 + g_width * 0.9, y: -g_length * 0.4 },
 			)
 		) {
 			gameOver = true;
@@ -470,6 +538,7 @@
 			onclick={() => {
 				go = !go;
 				if (go) req = requestAnimationFrame(animate);
+				gameOver = false
 			}}
 		>
 			{go ? 'Pause' : 'Play'}
@@ -591,7 +660,7 @@
 	<div>
 		{#if gameOver}
 			<div class="mb-4 w-full text-center text-2xl font-bold text-green-600">
-				{winner === 'left' ? 'Left' : 'Right'} side wins!
+				{winner === 'left' ? 'Right' : 'Left'} side wins!
 			</div>
 		{/if}
 	</div>
